@@ -20,6 +20,8 @@ var space: PhysicsDirectSpaceState2D
 
 var CCD_shapes: Array[RID]
 
+var debug_vectors: Array[Rect2]
+
 class WrappedObject:
 	var collider: CollisionObject2D:
 		set(value):
@@ -79,28 +81,29 @@ func _physics_process(delta: float) -> void:
 			var point: Rect2 = calc_tangent(curr_object,global_points[point_i-1],curr_object.normal1)
 			global_points[point_i] = point.position
 			curr_object.normal1 = point.size
-			point = calc_tangent(curr_object,global_points[point_i+1],curr_object.normal2)
+			point = calc_tangent(curr_object,global_points[point_i+2],curr_object.normal2)
 			global_points[point_i+1] = point.position
 			curr_object.normal2 = point.size
 			
 			#prev_object = curr_object
 			#curr_object = next_object
 		
-		for i:int in range(wrapped_objects.size() - 1):
+		for i:int in range(1, wrapped_objects.size()):
 			var point_i = i * 2 - 1
-			var new_object: WrappedObject = cast_ray(global_points[point_i],global_points[point_i + 1],[wrapped_objects[i+1].rid])
+			#cast ray back to previous object
+			var new_object: WrappedObject = cast_ray(global_points[point_i],global_points[point_i - 1],[wrapped_objects[i-1].rid])
 			if new_object != null:
-				var normal: Vector2 = calc_normal(i,new_object,delta)
-				var point: Rect2 = calc_tangent(new_object,global_points[point_i],normal)
-				global_points.insert(point_i+1,point.position)
+				var normal: Vector2 = calc_normal(point_i - 1,new_object,delta)
+				var point: Rect2 = calc_tangent(new_object,global_points[point_i - 1],normal)
+				global_points.insert(point_i,point.position)
 				new_object.normal1 = point.size
-				point = calc_tangent(new_object,global_points[point_i+1],normal)
-				global_points.insert(point_i+2,point.position)
+				point = calc_tangent(new_object,global_points[point_i],normal)
+				global_points.insert(point_i+1,point.position)
 				new_object.normal2 = point.size
-				wrapped_objects.insert(i+1,new_object)
+				wrapped_objects.insert(i,new_object)
 	
 	#calc_global_points()
-	prev_global_points = global_points
+	prev_global_points = global_points.duplicate()
 	queue_redraw()
 
 func cast_ray(A:Vector2,B:Vector2,exclude:Array[RID]) -> WrappedObject:
@@ -145,17 +148,17 @@ func calc_normal(index:int,object:WrappedObject,time_delta:float)->Vector2:
 	var delta1: Vector2 = global_points[index] - prev_global_points[index]
 	var delta2: Vector2 = global_points[index+1] - prev_global_points[index+1] - delta1
 	var line_orthogonal: Vector2 = (global_points[index] - global_points[index+1]).orthogonal()
-	var line_normal: Vector2 = line_orthogonal * sign(line_orthogonal.dot(delta2))
+	var line_normal: Vector2 = line_orthogonal * - sign(line_orthogonal.dot(delta2))
 	#object normal
 	var object_normal: Vector2 = Vector2.ZERO
 	if object.collider in CCD_shapes:
 		#can get previous position
 		pass
 	elif object.collider is RigidBody2D:
-		object_normal = object.linear_velocity * time_delta - delta1
+		object_normal = object.collider.linear_velocity * time_delta - delta1
 	elif object.collider is CharacterBody2D:
-		object_normal = object.get_real_velocity() * time_delta - delta1
-	
+		object_normal = object.collider.get_real_velocity() * time_delta - delta1
+	debug_vector(object.collider.global_position,object.collider.global_position + object_normal * 100)
 	var normal: Vector2 = (object_normal + line_normal).normalized()
 	if normal.is_zero_approx():
 		var vector_to_center: Vector2 = object.get_global_transform().origin - global_points[index]
@@ -168,7 +171,9 @@ func _draw() -> void:
 	draw_set_transform_matrix(self.global_transform.inverse())
 	draw_polyline(global_points,Color.DARK_RED,2,true)
 	for point: Vector2 in global_points:
-		draw_circle(point,2,Color.WEB_GREEN,true)
+		draw_circle(point,1,Color.WEB_GREEN,true)
+	for vector in debug_vectors:
+		draw_line(vector.position,vector.size,Color.WEB_PURPLE)
 
 func calc_global_points()->void:
 	global_points.clear()
@@ -177,3 +182,6 @@ func calc_global_points()->void:
 		global_points.append(wrapped_objects[i].tangent1)
 		global_points.append(wrapped_objects[i].tangent2)
 	global_points.append(wrapped_objects[-1].tangent1)
+
+func debug_vector(from:Vector2,to:Vector2)->void:
+	debug_vectors.append(Rect2(from,to))
