@@ -71,29 +71,31 @@ func _physics_process(delta: float) -> void:
 		var curr_object: WrappedObject = wrapped_objects[0]
 		#var next_object: WrappedObject = wrapped_objects[1]
 		for i:int in range(1,wrapped_objects.size() - 1):
+			var point_i = i * 2 - 1
 			#var prev_object: WrappedObject = curr_object
 			curr_object = wrapped_objects[i]
 			#next_object = wrapped_objects[i+1]
 			
-			var point: Rect2 = calc_tangent(curr_object,global_points[i-1],curr_object.normal1)
-			global_points[i] = point.position
+			var point: Rect2 = calc_tangent(curr_object,global_points[point_i-1],curr_object.normal1)
+			global_points[point_i] = point.position
 			curr_object.normal1 = point.size
-			point = calc_tangent(curr_object,global_points[i+1],curr_object.normal2)
-			global_points[i+1] = point.position
+			point = calc_tangent(curr_object,global_points[point_i+1],curr_object.normal2)
+			global_points[point_i+1] = point.position
 			curr_object.normal2 = point.size
 			
 			#prev_object = curr_object
 			#curr_object = next_object
 		
 		for i:int in range(wrapped_objects.size() - 1):
-			var new_object: WrappedObject = cast_ray(wrapped_objects[i].tangent2,wrapped_objects[i+1].tangent2,[wrapped_objects[i+1].rid])
+			var point_i = i * 2 - 1
+			var new_object: WrappedObject = cast_ray(global_points[point_i],global_points[point_i + 1],[wrapped_objects[i+1].rid])
 			if new_object != null:
 				var normal: Vector2 = calc_normal(i,new_object,delta)
-				var point: Rect2 = calc_tangent(new_object,global_points[i-1],normal)
-				global_points.insert(i+1,point.position)
+				var point: Rect2 = calc_tangent(new_object,global_points[point_i],normal)
+				global_points.insert(point_i+1,point.position)
 				new_object.normal1 = point.size
-				point = calc_tangent(curr_object,global_points[i+1],normal)
-				global_points.insert(i+2,point.position)
+				point = calc_tangent(new_object,global_points[point_i+1],normal)
+				global_points.insert(point_i+2,point.position)
 				new_object.normal2 = point.size
 				wrapped_objects.insert(i+1,new_object)
 	
@@ -132,8 +134,9 @@ func calc_tangent(object:WrappedObject, from:Vector2, normal:Vector2)->Rect2:
 			pass
 		PhysicsServer2D.ShapeType.SHAPE_CONCAVE_POLYGON:
 			pass
+		_:
+			print("shape type not handled")
 	
-	print("shape type not handled")
 	return result
 
 func calc_normal(index:int,object:WrappedObject,time_delta:float)->Vector2:
