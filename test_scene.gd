@@ -3,7 +3,6 @@ extends Node2D
 @export var rope: TaughtRope
 @export var rope_speed: float = 100
 
-
 func _process(delta: float) -> void:
 	var direction: Vector2 = Vector2.ZERO
 	if Input.is_key_pressed(KEY_UP):
