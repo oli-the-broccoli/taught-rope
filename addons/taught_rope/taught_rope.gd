@@ -43,6 +43,7 @@ class WrappedObject:
 func _ready() -> void:
 	space = get_world_2d().direct_space_state
 	rope_start = self.global_position
+	rope_end = self.global_position
 	wrapped_objects.append(WrappedObject.new())
 	wrapped_objects[0].tangent2 = rope_start
 	global_points.append(rope_start)
@@ -50,16 +51,16 @@ func _ready() -> void:
 	wrapped_objects[-1].tangent1 = rope_end
 	global_points.append(rope_end)
 	
-	draw_set_transform_matrix(self.global_transform.inverse())
+	
 	#if CCD_group != null:
 		#get_tree().get_nodes_in_group(CCD_group)
 	
 
 
-func _notification(what: int) -> void:
-	match what:
-		NOTIFICATION_TRANSFORM_CHANGED:
-			draw_set_transform_matrix(self.global_transform.inverse())
+#func _notification(what: int) -> void:
+	#match what:
+		#NOTIFICATION_TRANSFORM_CHANGED:
+			#draw_set_transform_matrix(self.global_transform.inverse())
 
 func _physics_process(delta: float) -> void:
 	global_points[0] = rope_start
@@ -96,14 +97,15 @@ func _physics_process(delta: float) -> void:
 				new_object.normal2 = point.size
 				wrapped_objects.insert(i+1,new_object)
 	
-	calc_global_points()
+	#calc_global_points()
 	prev_global_points = global_points
+	queue_redraw()
 
 func cast_ray(A:Vector2,B:Vector2,exclude:Array[RID]) -> WrappedObject:
 	var query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(A,B,collision_mask)
 	query.exclude = exclude
 	var result: Dictionary = space.intersect_ray(query)
-	if result == null:
+	if result == {}:
 		return null
 	else:
 		var new_object: WrappedObject = WrappedObject.new()
@@ -160,13 +162,14 @@ func calc_normal(index:int,object:WrappedObject,time_delta:float)->Vector2:
 		return normal
 
 func _draw() -> void:
+	draw_set_transform_matrix(self.global_transform.inverse())
 	draw_polyline(global_points,Color.DARK_RED,2,true)
 	for point: Vector2 in global_points:
 		draw_circle(point,2,Color.WEB_GREEN,true)
 
 func calc_global_points()->void:
 	global_points.clear()
-	global_points[0] = wrapped_objects[0].tangent2
+	global_points.append(wrapped_objects[0].tangent2)
 	for i:int in range(wrapped_objects.size()-1):
 		global_points.append(wrapped_objects[i].tangent1)
 		global_points.append(wrapped_objects[i].tangent2)
