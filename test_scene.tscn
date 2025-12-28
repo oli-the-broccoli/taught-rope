@@ -15,6 +15,7 @@ script = ExtResource("2_sasra")
 metadata/_custom_type_script = "uid://fud7pr2rp6cm"
 
 [node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(3, 3)
 
 [node name="StaticBody2D" type="StaticBody2D" parent="."]
 position = Vector2(-31, 39)
