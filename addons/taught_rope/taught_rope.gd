@@ -12,6 +12,7 @@ enum DetectionType{RAYCAST,SHAPECAST,AREA}
 var rope_start: Vector2 = Vector2.ZERO
 var rope_end: Vector2
 var wrapped_objects: Array[WrappedObject]
+var unwrap_queue: Array[WrappedObject]
 var prev_global_points: Array[Vector2]
 var global_points: Array[Vector2]
 var local_points: Array[Vector2]
@@ -23,6 +24,7 @@ var CCD_shapes: Array[RID]
 var debug_vectors: Array[Rect2]
 
 class WrappedObject:
+	var array_index:int
 	var collider: CollisionObject2D:
 		set(value):
 			collider = value
@@ -37,7 +39,32 @@ class WrappedObject:
 	var tangent2: Vector2
 	var normal1: Vector2
 	var normal2: Vector2
-	var turns: int = 0
+	var half_turn: int = 0
+	var prev_direction: int
+	var wrap_angle: float = 0
+	var direction: int
+	
+	## calcs wrap angle and returns true if the object should be released
+	func calc_wrap_angle()->bool:
+		var half_turns: int = floor(abs(wrap_angle/PI)) * direction
+		var is_full_turn: bool = (half_turns % 2) == 0
+		var norm_angle: float = normal1.angle_to(normal2)
+		print(half_turns)
+		if half_turns == 0 and abs(norm_angle) < PI/2:
+			
+			if sign(wrap_angle) != sign(norm_angle):
+				print('removing')
+				return true
+		wrap_angle = snappedi(half_turns,2) * PI
+		if is_full_turn:
+			wrap_angle += norm_angle
+		else:
+			wrap_angle += (TAU - abs(norm_angle)) * - direction
+		print(wrap_angle)
+		return false
+	
+	func get_norm_angle()->float:
+		return normal1.angle_to(normal2)
 	
 	func get_global_transform()->Transform2D:
 		return collider.global_transform * PhysicsServer2D.body_get_shape_transform(rid,shape)
@@ -84,9 +111,23 @@ func _physics_process(delta: float) -> void:
 			point = calc_tangent(curr_object,global_points[point_i+2],curr_object.normal2)
 			global_points[point_i+1] = point.position
 			curr_object.normal2 = point.size
+			if curr_object.calc_wrap_angle() == true:
+				# release object
+				unwrap_queue.append(curr_object)
+				
+			
+			
 			
 			#prev_object = curr_object
 			#curr_object = next_object
+		
+		for i:int in range(0,unwrap_queue.size(),-1):
+			var object: WrappedObject = unwrap_queue[i]
+			var point_i: int = 2 * object.array_index - 1
+			global_points.remove_at(point_i)
+			global_points.remove_at(point_i + 1)
+			wrapped_objects.remove_at(object.array_index)
+			object.free()
 		
 		for i:int in range(1, wrapped_objects.size()):
 			var point_i = i * 2 - 1
@@ -100,6 +141,11 @@ func _physics_process(delta: float) -> void:
 				point = calc_tangent(new_object,global_points[point_i],normal)
 				global_points.insert(point_i+1,point.position)
 				new_object.normal2 = point.size
+				var init_wrap_angle: float = new_object.normal1.angle_to(normal)
+				init_wrap_angle += normal.angle_to(new_object.normal2)
+				new_object.wrap_angle = init_wrap_angle
+				new_object.direction = sign(init_wrap_angle)
+				new_object.array_index = i
 				wrapped_objects.insert(i,new_object)
 	
 	#calc_global_points()
