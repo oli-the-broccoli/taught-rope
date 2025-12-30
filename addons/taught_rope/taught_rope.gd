@@ -46,18 +46,19 @@ class WrappedObject:
 	
 	## calcs wrap angle and returns true if the object should be released
 	func calc_turns()->void:
+		#orth dot describes which side of normal 1 does normal 2 lie, ie CC or CCW
 		var orth_dot: int = sign(normal1.orthogonal().dot(normal2))
 		#var quad: int = 1 + int(norm_dot < 0) + 2 * int(orth_dot < 0)
 		
 		if orth_dot != prev_orth_dot:
+			#orth changed side
 			if sign(normal1.dot(prev_orth2)) == sign(normal2.dot(prev_orth2)):
+				#this checks if normal 2 is on the same side as normal 1 compared to the orth2
+				#basically checking if it is closer to adding a half turn or full turn (only care about full turn)
 				turns -= orth_dot * direction
 		
 		prev_orth2 = normal2.orthogonal()
 		prev_orth_dot = orth_dot
-	
-	func get_norm_angle()->float:
-		return normal1.angle_to(normal2)
 	
 	func get_global_transform()->Transform2D:
 		return collider.global_transform * PhysicsServer2D.body_get_shape_transform(rid,shape)
@@ -99,14 +100,15 @@ func _physics_process(delta: float) -> void:
 			curr_object = wrapped_objects[i]
 			#next_object = wrapped_objects[i+1]
 			
+			#find next tangent points
 			var point: Rect2 = calc_tangent(curr_object,global_points[point_i-1],curr_object.normal1)
 			global_points[point_i] = point.position
 			curr_object.normal1 = point.size
 			point = calc_tangent(curr_object,global_points[point_i+2],curr_object.normal2)
 			global_points[point_i+1] = point.position
 			curr_object.normal2 = point.size
+			
 			curr_object.calc_turns()
-			#print(curr_object.turns)
 			if curr_object.turns < 0:
 				## release object
 				unwrap_queue.append(curr_object)
@@ -138,8 +140,8 @@ func _physics_process(delta: float) -> void:
 				global_points.insert(point_i+1,point.position)
 				new_object.normal2 = point.size
 				new_object.prev_orth2 = point.size.orthogonal()
-				#var init_wrap_angle: float = new_object.normal1.angle_to(normal)
-				#init_wrap_angle += normal.angle_to(new_object.normal2)
+				#get the initial wrap direction +ve for CW and -ve for CCW
+				#uses the dot product of the rope direction and the contact point orthogonal to get the direction of curviture
 				new_object.direction = sign(normal.orthogonal().dot(global_points[point_i-1] - point.position))
 				new_object.array_index = i
 				wrapped_objects.insert(i,new_object)
