@@ -15,3 +15,4 @@ func _process(delta: float) -> void:
 		direction.x += 1
 	
 	rope.rope_end += direction.normalized() * rope_speed * delta
+	rope.rope_end = $Camera2D.get_global_mouse_position()
