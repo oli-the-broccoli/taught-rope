@@ -73,6 +73,7 @@ func _ready() -> void:
 	wrapped_objects.append(WrappedObject.new())
 	wrapped_objects[-1].tangent1 = rope_end
 	global_points.append(rope_end)
+	prev_global_points = global_points.duplicate()
 	
 	
 	#if CCD_group != null:
@@ -89,6 +90,7 @@ func _physics_process(delta: float) -> void:
 	
 	global_points[0] = rope_start
 	global_points[-1] = rope_end
+	
 	if detection_type == DetectionType.RAYCAST:
 		
 
@@ -186,27 +188,28 @@ func calc_tangent(object:WrappedObject, from:Vector2, normal:Vector2)->Rect2:
 	
 	return result
 
-func calc_normal(index:int,object:WrappedObject,time_delta:float)->Vector2:
-	#all movement relative to 1st point
-	#line normal
-	var delta1: Vector2 = global_points[index] - prev_global_points[index]
-	var delta2: Vector2 = global_points[index+1] - prev_global_points[index+1] - delta1
-	var line_orthogonal: Vector2 = (global_points[index] - global_points[index+1]).orthogonal()
-	var line_normal: Vector2 = line_orthogonal * - sign(line_orthogonal.dot(delta2))
-	#object normal
-	var object_normal: Vector2 = Vector2.ZERO
+func calc_normal(line_pos:float,index:int,object:WrappedObject)->Vector2:
+	var rope_orthogonal: Vector2 = (global_points[index] - global_points[index+1]).orthogonal().normalized()
+	#rope velocity
+	var point1_delta: Vector2 = global_points[index] - prev_global_points[index]
+	var point2_delta: Vector2 = global_points[index+1] - prev_global_points[index+1]
+	var rope_velocity: Vector2 = (line_pos * point2_delta + (1 - line_pos) * point1_delta) / get_physics_process_delta_time()
+	
+	#object point (of collision) velocity
+	#TODO get the collision points velocity (including the object rotation) not just the objects velocity
+	var point_velocity: Vector2 = Vector2.ZERO
 	if object.collider in CCD_shapes:
 		#can get previous position
 		pass
 	elif object.collider is RigidBody2D:
-		object_normal = object.collider.linear_velocity * time_delta - delta1
+		point_velocity = object.collider.linear_velocity
 	elif object.collider is CharacterBody2D:
-		object_normal = object.collider.get_real_velocity() * time_delta - delta1
-	debug_vector(object.collider.global_position,object.collider.global_position + object_normal * 100)
-	var normal: Vector2 = (object_normal + line_normal).normalized()
+		point_velocity = object.collider.get_real_velocity()
+	
+	var normal: Vector2 = rope_orthogonal * rope_orthogonal.dot(point_velocity - rope_velocity)
 	if normal.is_zero_approx():
 		var vector_to_center: Vector2 = object.get_global_transform().origin - global_points[index]
-		normal = line_orthogonal.normalized() * sign(line_orthogonal.dot(vector_to_center))
+		normal = rope_orthogonal * sign(rope_orthogonal.dot(vector_to_center))
 		return normal
 	else:
 		return normal
