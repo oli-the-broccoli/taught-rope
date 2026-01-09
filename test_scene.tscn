@@ -12,6 +12,9 @@ rope = NodePath("TaughtRope")
 
 [node name="TaughtRope" type="Node2D" parent="."]
 script = ExtResource("2_sasra")
+detection_type = null
+collision_mask = null
+CCD_group = null
 metadata/_custom_type_script = "uid://fud7pr2rp6cm"
 
 [node name="Camera2D" type="Camera2D" parent="."]
