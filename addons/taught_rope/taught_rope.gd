@@ -12,6 +12,7 @@ enum DetectionType{RAYCAST,SHAPECAST,AREA}
 var rope_start: Vector2 = Vector2.ZERO
 var rope_end: Vector2
 var wrapped_objects: Array[WrappedObject]
+var unwrap_queue: Array[WrappedObject]
 var prev_global_points: Array[Vector2]
 var global_points: Array[Vector2]
 var local_points: Array[Vector2]
@@ -23,6 +24,7 @@ var CCD_shapes: Array[RID]
 var debug_vectors: Array[Rect2]
 
 class WrappedObject:
+	var array_index:int
 	var collider: CollisionObject2D:
 		set(value):
 			collider = value
@@ -37,7 +39,26 @@ class WrappedObject:
 	var tangent2: Vector2
 	var normal1: Vector2
 	var normal2: Vector2
+	var prev_orth2: Vector2
+	var prev_orth_dot: int
 	var turns: int = 0
+	var direction: int
+	
+	## calcs wrap angle and returns true if the object should be released
+	func calc_turns()->void:
+		#orth dot describes which side of normal 1 does normal 2 lie, ie CC or CCW
+		var orth_dot: int = sign(normal1.orthogonal().dot(normal2))
+		#var quad: int = 1 + int(norm_dot < 0) + 2 * int(orth_dot < 0)
+		
+		if orth_dot != prev_orth_dot:
+			#orth changed side
+			if sign(normal1.dot(prev_orth2)) == sign(normal2.dot(prev_orth2)):
+				#this checks if normal 2 is on the same side as normal 1 compared to the orth2
+				#basically checking if it is closer to adding a half turn or full turn (only care about full turn)
+				turns -= orth_dot * direction
+		
+		prev_orth2 = normal2.orthogonal()
+		prev_orth_dot = orth_dot
 	
 	func get_global_transform()->Transform2D:
 		return collider.global_transform * PhysicsServer2D.body_get_shape_transform(rid,shape)
@@ -65,6 +86,7 @@ func _ready() -> void:
 			#draw_set_transform_matrix(self.global_transform.inverse())
 
 func _physics_process(delta: float) -> void:
+	
 	global_points[0] = rope_start
 	global_points[-1] = rope_end
 	if detection_type == DetectionType.RAYCAST:
@@ -78,6 +100,7 @@ func _physics_process(delta: float) -> void:
 			curr_object = wrapped_objects[i]
 			#next_object = wrapped_objects[i+1]
 			
+			#find next tangent points
 			var point: Rect2 = calc_tangent(curr_object,global_points[point_i-1],curr_object.normal1)
 			global_points[point_i] = point.position
 			curr_object.normal1 = point.size
@@ -85,8 +108,24 @@ func _physics_process(delta: float) -> void:
 			global_points[point_i+1] = point.position
 			curr_object.normal2 = point.size
 			
+			curr_object.calc_turns()
+			if curr_object.turns < 0:
+				## release object
+				unwrap_queue.append(curr_object)
+				
+			
+			
+			
 			#prev_object = curr_object
 			#curr_object = next_object
+		for i:int in range(unwrap_queue.size()-1,-1,-1):
+			print('unwrap')
+			var object: WrappedObject = unwrap_queue[i]
+			var point_i: int = 2 * object.array_index - 1
+			global_points.remove_at(point_i)
+			global_points.remove_at(point_i + 1)
+			wrapped_objects.remove_at(object.array_index)
+		unwrap_queue.clear()
 		
 		for i:int in range(1, wrapped_objects.size()):
 			var point_i = i * 2 - 1
@@ -100,6 +139,11 @@ func _physics_process(delta: float) -> void:
 				point = calc_tangent(new_object,global_points[point_i],normal)
 				global_points.insert(point_i+1,point.position)
 				new_object.normal2 = point.size
+				new_object.prev_orth2 = point.size.orthogonal()
+				#get the initial wrap direction +ve for CW and -ve for CCW
+				#uses the dot product of the rope direction and the contact point orthogonal to get the direction of curviture
+				new_object.direction = sign(normal.orthogonal().dot(global_points[point_i-1] - point.position))
+				new_object.array_index = i
 				wrapped_objects.insert(i,new_object)
 	
 	#calc_global_points()
@@ -174,6 +218,7 @@ func _draw() -> void:
 		draw_circle(point,1,Color.WEB_GREEN,true)
 	for vector in debug_vectors:
 		draw_line(vector.position,vector.size,Color.WEB_PURPLE)
+	debug_vectors.clear()
 
 func calc_global_points()->void:
 	global_points.clear()
