@@ -39,7 +39,8 @@ class WrappedObject:
 	var tangent2: Vector2
 	var normal1: Vector2
 	var normal2: Vector2
-	var prev_orth2: Vector2
+	# here using the dot product as its cheeper than calculating angles
+	var prev_dot: float
 	var prev_orth_dot: int
 	var turns: int = 0
 	var direction: int
@@ -48,16 +49,19 @@ class WrappedObject:
 	func calc_turns()->void:
 		#orth dot describes which side of normal 1 does normal 2 lie, ie CC or CCW
 		var orth_dot: int = sign(normal1.orthogonal().dot(normal2))
+		if orth_dot == 0:
+			return
 		#var quad: int = 1 + int(norm_dot < 0) + 2 * int(orth_dot < 0)
-		
+		var dot: float = normal1.dot(normal2)
 		if orth_dot != prev_orth_dot:
 			#orth changed side
-			if sign(normal1.dot(prev_orth2)) == sign(normal2.dot(prev_orth2)):
-				#this checks if normal 2 is on the same side as normal 1 compared to the orth2
+			if dot + prev_dot > -1:
+				#is the new angle plus the old angle less than 180 degrees (in dot product terms)
 				#basically checking if it is closer to adding a half turn or full turn (only care about full turn)
 				turns -= orth_dot * direction
+				print(turns)
 		
-		prev_orth2 = normal2.orthogonal()
+		prev_dot = dot
 		prev_orth_dot = orth_dot
 	
 	func get_global_transform()->Transform2D:
@@ -121,7 +125,6 @@ func _physics_process(delta: float) -> void:
 			#prev_object = curr_object
 			#curr_object = next_object
 		for i:int in range(unwrap_queue.size()-1,-1,-1):
-			print('unwrap')
 			var object: WrappedObject = unwrap_queue[i]
 			var point_i: int = 2 * object.array_index - 1
 			global_points.remove_at(point_i)
@@ -132,19 +135,26 @@ func _physics_process(delta: float) -> void:
 		for i:int in range(1, wrapped_objects.size()):
 			var point_i = i * 2 - 1
 			#cast ray back to previous object
-			var new_object: WrappedObject = cast_ray(global_points[point_i],global_points[point_i - 1],[wrapped_objects[i-1].rid])
-			if new_object != null:
-				var normal: Vector2 = calc_normal(point_i - 1,new_object,delta)
-				var point: Rect2 = calc_tangent(new_object,global_points[point_i - 1],normal)
-				global_points.insert(point_i,point.position)
-				new_object.normal1 = point.size
-				point = calc_tangent(new_object,global_points[point_i],normal)
-				global_points.insert(point_i+1,point.position)
-				new_object.normal2 = point.size
-				new_object.prev_orth2 = point.size.orthogonal()
+			var exclude: Array[RID] = [wrapped_objects[i-1].rid,wrapped_objects[i].rid]
+			var collision_result: Dictionary = cast_ray(global_points[point_i],global_points[point_i - 1],exclude)
+			if collision_result != {}:
+				var new_object: WrappedObject = collision_result.object
+				var normal: Vector2 = calc_normal(collision_result.line_pos, collision_result.position, point_i - 1, new_object)
+				var point1: Rect2 = calc_tangent(new_object,global_points[point_i - 1],normal)
+				var point2: Rect2 = calc_tangent(new_object,global_points[point_i],normal)
+				new_object.prev_orth_dot = sign(point1.size.orthogonal().dot(point2.size))
+				if new_object.prev_orth_dot == 0:
+					#the normals point same direction so we cant determine the wrap direction
+					#cancel creating the object, the next itteration should hopefully catch when the rope is deeper in the object
+					#and a non zero angle between normals will be made
+					continue
+				global_points.insert(point_i,point1.position)
+				new_object.normal1 = point1.size
+				global_points.insert(point_i+1,point2.position)
+				new_object.normal2 = point2.size
+				new_object.prev_dot = new_object.normal1.dot(new_object.normal2)
 				#get the initial wrap direction +ve for CW and -ve for CCW
-				#uses the dot product of the rope direction and the contact point orthogonal to get the direction of curviture
-				new_object.direction = sign(normal.orthogonal().dot(global_points[point_i-1] - point.position))
+				new_object.direction = - new_object.prev_orth_dot
 				new_object.array_index = i
 				wrapped_objects.insert(i,new_object)
 	
@@ -152,17 +162,22 @@ func _physics_process(delta: float) -> void:
 	prev_global_points = global_points.duplicate()
 	queue_redraw()
 
-func cast_ray(A:Vector2,B:Vector2,exclude:Array[RID]) -> WrappedObject:
+func cast_ray(A:Vector2,B:Vector2,exclude:Array[RID]) -> Dictionary:
 	var query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(A,B,collision_mask)
+	query.hit_from_inside = false
 	query.exclude = exclude
 	var result: Dictionary = space.intersect_ray(query)
+	var collision_result: Dictionary = {}
 	if result == {}:
-		return null
+		return collision_result
 	else:
 		var new_object: WrappedObject = WrappedObject.new()
 		new_object.collider = result.collider
 		new_object.shape = result.shape
-		return new_object
+		collision_result['object'] = new_object
+		collision_result['line_pos'] = (A - result.position).length() / (A-B).length()
+		collision_result['position'] = result.position
+		return collision_result
 
 ## returns a rect2 with the size represnting the tangent normal
 func calc_tangent(object:WrappedObject, from:Vector2, normal:Vector2)->Rect2:
@@ -188,7 +203,7 @@ func calc_tangent(object:WrappedObject, from:Vector2, normal:Vector2)->Rect2:
 	
 	return result
 
-func calc_normal(line_pos:float,index:int,object:WrappedObject)->Vector2:
+func calc_normal(line_pos:float,collision_position:Vector2,index:int,object:WrappedObject)->Vector2:
 	var rope_orthogonal: Vector2 = (global_points[index] - global_points[index+1]).orthogonal().normalized()
 	#rope velocity
 	var point1_delta: Vector2 = global_points[index] - prev_global_points[index]
@@ -196,14 +211,15 @@ func calc_normal(line_pos:float,index:int,object:WrappedObject)->Vector2:
 	var rope_velocity: Vector2 = (line_pos * point2_delta + (1 - line_pos) * point1_delta) / get_physics_process_delta_time()
 	
 	#object point (of collision) velocity
-	#TODO get the collision points velocity (including the object rotation) not just the objects velocity
 	var point_velocity: Vector2 = Vector2.ZERO
 	if object.collider in CCD_shapes:
 		#can get previous position
 		pass
 	elif object.collider is RigidBody2D:
-		point_velocity = object.collider.linear_velocity
+		point_velocity = object.collider.linear_velocity 
+		point_velocity += object.collider.angular_velocity * (collision_position - object.collider.global_transform.origin).orthogonal()
 	elif object.collider is CharacterBody2D:
+		#cant get angular velocity
 		point_velocity = object.collider.get_real_velocity()
 	
 	var normal: Vector2 = rope_orthogonal * rope_orthogonal.dot(point_velocity - rope_velocity)
