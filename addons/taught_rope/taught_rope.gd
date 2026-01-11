@@ -24,7 +24,6 @@ var CCD_shapes: Array[RID]
 var debug_vectors: Array[Rect2]
 
 class WrappedObject:
-	var array_index:int
 	var collider: CollisionObject2D:
 		set(value):
 			collider = value
@@ -35,8 +34,6 @@ class WrappedObject:
 			shape = value
 			shape_rid = PhysicsServer2D.body_get_shape(rid,shape)
 	var shape_rid: RID
-	var tangent1: Vector2
-	var tangent2: Vector2
 	var normal1: Vector2
 	var normal2: Vector2
 	# here using the dot product as its cheeper than calculating angles
@@ -59,7 +56,6 @@ class WrappedObject:
 				#is the new angle plus the old angle less than 180 degrees (in dot product terms)
 				#basically checking if it is closer to adding a half turn or full turn (only care about full turn)
 				turns -= orth_dot * direction
-				print(turns)
 		
 		prev_dot = dot
 		prev_orth_dot = orth_dot
@@ -72,10 +68,8 @@ func _ready() -> void:
 	rope_start = self.global_position
 	rope_end = self.global_position
 	wrapped_objects.append(WrappedObject.new())
-	wrapped_objects[0].tangent2 = rope_start
 	global_points.append(rope_start)
 	wrapped_objects.append(WrappedObject.new())
-	wrapped_objects[-1].tangent1 = rope_end
 	global_points.append(rope_end)
 	prev_global_points = global_points.duplicate()
 	
@@ -116,20 +110,16 @@ func _physics_process(delta: float) -> void:
 			
 			curr_object.calc_turns()
 			if curr_object.turns < 0:
-				## release object
+				# release object
 				unwrap_queue.append(curr_object)
 				
 			
-			
-			
-			#prev_object = curr_object
-			#curr_object = next_object
-		for i:int in range(unwrap_queue.size()-1,-1,-1):
-			var object: WrappedObject = unwrap_queue[i]
-			var point_i: int = 2 * object.array_index - 1
+		for object:WrappedObject in unwrap_queue:
+			var object_i = wrapped_objects.find(object)
+			var point_i: int = 2 * object_i - 1
 			global_points.remove_at(point_i)
-			global_points.remove_at(point_i + 1)
-			wrapped_objects.remove_at(object.array_index)
+			global_points.remove_at(point_i)
+			wrapped_objects.remove_at(object_i)
 		unwrap_queue.clear()
 		
 		for i:int in range(1, wrapped_objects.size()):
@@ -155,10 +145,8 @@ func _physics_process(delta: float) -> void:
 				new_object.prev_dot = new_object.normal1.dot(new_object.normal2)
 				#get the initial wrap direction +ve for CW and -ve for CCW
 				new_object.direction = - new_object.prev_orth_dot
-				new_object.array_index = i
 				wrapped_objects.insert(i,new_object)
 	
-	#calc_global_points()
 	prev_global_points = global_points.duplicate()
 	queue_redraw()
 
@@ -232,7 +220,7 @@ func calc_normal(line_pos:float,collision_position:Vector2,index:int,object:Wrap
 
 func _draw() -> void:
 	draw_set_transform_matrix(self.global_transform.inverse())
-	draw_polyline(global_points,Color.DARK_RED,2,true)
+	draw_polyline(global_points,Color.DARK_RED,1,true)
 	for point: Vector2 in global_points:
 		draw_circle(point,1,Color.WEB_GREEN,true)
 	for vector in debug_vectors:
