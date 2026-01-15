@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=3 uid="uid://brkcns5ekxss2"]
+
+[ext_resource type="Script" uid="uid://ooqa41wduwk" path="res://soft_rope_test.gd" id="1_x8yrp"]
+[ext_resource type="Script" uid="uid://dukhop6enx3nn" path="res://addons/taught_rope/soft_rope.gd" id="2_63hu4"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_63hu4"]
+
+[node name="SoftRopeTest" type="Node2D" node_paths=PackedStringArray("soft_rope")]
+script = ExtResource("1_x8yrp")
+soft_rope = NodePath("SoftRope")
+
+[node name="SoftRope" type="Node2D" parent="."]
+script = ExtResource("2_63hu4")
+itterations = 40
+metadata/_custom_type_script = "uid://dukhop6enx3nn"
+
+[node name="Camera2D" type="Camera2D" parent="."]
+
+[node name="RigidBody2D" type="RigidBody2D" parent="."]
+position = Vector2(-203, -373)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RigidBody2D"]
+shape = SubResource("CircleShape2D_63hu4")
