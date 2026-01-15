@@ -15,8 +15,10 @@ func _disable_plugin() -> void:
 func _enter_tree() -> void:
 	# Initialization of the plugin goes here.
 	add_custom_type('TaughtRope','Node2D',preload("taught_rope.gd"),preload("icon.svg"))
+	add_custom_type('SoftRope','Node2D',preload("soft_rope.gd"),preload("icon.svg"))
 
 
 func _exit_tree() -> void:
 	# Clean-up of the plugin goes here.
 	remove_custom_type('TaughtRope')
+	remove_custom_type('SoftRope')
