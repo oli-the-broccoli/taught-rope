@@ -2,7 +2,7 @@ class_name SoftRope
 extends Node2D
 
 
-@export_flags_2d_physics var collision_mask: int
+@export_flags_2d_physics var collision_mask: int = 1
 @export var gravity_scale: float = 1.0
 var _gravity: Vector2
 @export var damping: float = 1
@@ -20,7 +20,11 @@ var _prev_positions: Array[Vector2]
 var positions: Array[Vector2]
 var velocities: Array[Vector2]
 
+var space: PhysicsDirectSpaceState2D
+var node_query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
+
 func _ready() -> void:
+	space = get_world_2d().direct_space_state
 	positions.resize(segments+1)
 	_prev_positions.resize(segments+1)
 	velocities.resize(segments+1)
@@ -30,24 +34,33 @@ func _ready() -> void:
 	for i:int in range(positions.size()):
 		positions[i] = Vector2(0,i * _segment_length)
 	_prev_positions = positions.duplicate(true)
+	
+	node_query.collision_mask = collision_mask
+	var circle = CircleShape2D.new()
+	circle.radius = thickness/2
+	node_query.shape = circle
+	
 
 func _physics_process(delta: float) -> void:
-	positions[0] = start_point
+	
 	simulate(delta)
+	#points being keyframed should be set here
+	positions[0] = start_point
 	for i:int in range(itterations):
 		constrain()
+	calc_velocities()
+	
 	queue_redraw()
 
 func simulate(delta:float)->void:
 	for i:int in range(positions.size()):
-		velocities[i] = (positions[i] - _prev_positions[i]) / delta
-		#MUST update prev position before adjusting the current one (only needed it for calculating velocity)
-		_prev_positions[i] = positions[i]
 		velocities[i] += _gravity * delta
 		velocities[i] *= max(1-damping*delta,0)
 		positions[i] = positions[i] + velocities[i] * delta
 
 func constrain() ->void:
+	#length constraint
+	
 	for i:int in range(1,positions.size()):
 		var segment: Vector2 = (positions[i] - positions[i-1])
 		var length: float = max(segment.length(),0.001) #too ensure not devidign by 0
@@ -57,8 +70,19 @@ func constrain() ->void:
 		else:
 			positions[i] -= move
 			positions[i-1] += move
-	
-	
+		
+		#having no motion currently means the impact absorbs all energy
+		#node_query.motion = positions[i] - _prev_positions[i]
+		node_query.transform = Transform2D(0,positions[i])
+		var result: Dictionary = space.get_rest_info(node_query)
+		if result != {}:
+			positions[i] = result.point + result.normal * thickness / 2
+
+func calc_velocities()->void:
+	for i:int in range(positions.size()):
+		velocities[i] = (positions[i] - _prev_positions[i]) / self.get_physics_process_delta_time()
+		_prev_positions[i] = positions[i]
+
 func _draw() -> void:
 	draw_set_transform_matrix(self.transform.inverse())
 	draw_polyline(positions,color,thickness,true)
