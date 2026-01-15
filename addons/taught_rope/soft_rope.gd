@@ -76,7 +76,7 @@ func constrain() ->void:
 		node_query.transform = Transform2D(0,positions[i])
 		var result: Dictionary = space.get_rest_info(node_query)
 		if result != {}:
-			positions[i] = result.point + result.normal * thickness / 2
+			positions[i] = result.point + result.normal * (thickness / 2 + 0.01)
 
 func calc_velocities()->void:
 	for i:int in range(positions.size()):
@@ -87,4 +87,4 @@ func _draw() -> void:
 	draw_set_transform_matrix(self.transform.inverse())
 	draw_polyline(positions,color,thickness,true)
 	for point: Vector2 in positions:
-		draw_circle(point,1,Color.GREEN)
+		draw_circle(point,1,Color.YELLOW)
