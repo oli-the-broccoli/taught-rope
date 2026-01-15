@@ -1,9 +1,13 @@
-[gd_scene load_steps=4 format=3 uid="uid://brkcns5ekxss2"]
+[gd_scene load_steps=5 format=3 uid="uid://brkcns5ekxss2"]
 
 [ext_resource type="Script" uid="uid://ooqa41wduwk" path="res://soft_rope_test.gd" id="1_x8yrp"]
 [ext_resource type="Script" uid="uid://dukhop6enx3nn" path="res://addons/taught_rope/soft_rope.gd" id="2_63hu4"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_63hu4"]
+radius = 58.76
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_63hu4"]
+size = Vector2(146.43, 20)
 
 [node name="SoftRopeTest" type="Node2D" node_paths=PackedStringArray("soft_rope")]
 script = ExtResource("1_x8yrp")
@@ -11,13 +15,36 @@ soft_rope = NodePath("SoftRope")
 
 [node name="SoftRope" type="Node2D" parent="."]
 script = ExtResource("2_63hu4")
-itterations = 40
+itterations = 200
+rope_length = 200.0
+segments = 20
 metadata/_custom_type_script = "uid://dukhop6enx3nn"
 
 [node name="Camera2D" type="Camera2D" parent="."]
 
 [node name="RigidBody2D" type="RigidBody2D" parent="."]
-position = Vector2(-203, -373)
+position = Vector2(-262, 27)
+gravity_scale = 0.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="RigidBody2D"]
 shape = SubResource("CircleShape2D_63hu4")
+
+[node name="StaticBody2D" type="StaticBody2D" parent="."]
+position = Vector2(194, 66)
+rotation = -0.5325432
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D"]
+shape = SubResource("RectangleShape2D_63hu4")
+
+[node name="StaticBody2D3" type="StaticBody2D" parent="."]
+position = Vector2(-147, 137)
+rotation = 0.036135674
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D3"]
+rotation = -0.0051262826
+shape = SubResource("RectangleShape2D_63hu4")
+
+[node name="StaticBody2D2" type="StaticBody2D" parent="."]
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="StaticBody2D2"]
+polygon = PackedVector2Array(167, -192, 57, -99, 193, -47, 289, -105, 333, 155, 361, -111, 340, -244, 328, -134)
