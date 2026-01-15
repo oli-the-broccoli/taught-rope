@@ -16,8 +16,8 @@ soft_rope = NodePath("SoftRope")
 [node name="SoftRope" type="Node2D" parent="."]
 script = ExtResource("2_63hu4")
 itterations = 200
-rope_length = 200.0
-segments = 20
+rope_length = 400.0
+segments = 80
 metadata/_custom_type_script = "uid://dukhop6enx3nn"
 
 [node name="Camera2D" type="Camera2D" parent="."]
@@ -41,6 +41,14 @@ position = Vector2(-147, 137)
 rotation = 0.036135674
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D3"]
+rotation = -0.0051262826
+shape = SubResource("RectangleShape2D_63hu4")
+
+[node name="StaticBody2D4" type="StaticBody2D" parent="."]
+position = Vector2(16.999985, 158.00002)
+rotation = -0.030200526
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D4"]
 rotation = -0.0051262826
 shape = SubResource("RectangleShape2D_63hu4")
 
