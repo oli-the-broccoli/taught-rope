@@ -6,6 +6,8 @@ extends Node2D
 @export var gravity_scale: float = 1.0
 var _gravity: Vector2
 @export var damping: float = 1
+@export_range(0,1,0.01) var bending_stiffness: float = 0.5
+@export var free_bending_radius: float = 50
 
 @export var itterations: int = 10
 @export var rope_length: float = 100
@@ -47,18 +49,20 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	
 	simulate(delta)
-	#points being keyframed should be set here
-	positions[0] = start_point
-	
 	var col_period: int
 	if resolve_collisions_while_constraining:
 		col_period = 1
 	else:
 		col_period = round(itterations / collision_itterations)
+	
 	for i:int in range(itterations):
+		#points being keyframed should be set here
+		positions[0] = start_point
 		constrain()
+		resolve_bending()
 		if (i + 1) % col_period == 0:
 			resolve_collisions()
+	
 	calc_velocities()
 	
 	queue_redraw()
@@ -80,7 +84,27 @@ func constrain() ->void:
 		else:
 			positions[i] -= move
 			positions[i-1] += move
-		
+	
+
+func resolve_bending()->void:
+	if not bending_stiffness == 0:
+		# ef describes the distance from the i to the midpoint between i-1 and i+1 when they are respectively equistance from i
+		# in the condition that the segments lie on a circle of radius free_bending_radius
+		# e2/2 + e1 describes this same distance for any placement of the three points
+		var ef: float = (_segment_length ** 2) / 2 / free_bending_radius
+		for i:int in range(1,positions.size()-1):
+			var span: Vector2 = positions[i+1] - positions[i-1]
+			var norm: Vector2 = (positions[i] - (positions[i-1] + span/2)).normalized()
+			var s: float = abs(norm.orthogonal().dot(span))
+			var segment: Vector2 = positions[i] - positions[i-1]
+			var e1: float = abs(segment.dot(norm))
+			var e2: float = abs(span.dot(norm))
+			#max displacement of middle point from span before free bending angle is breached
+			var h: float = (1.0/3.0) * max((e2/2 + e1) - ef,0) * bending_stiffness
+			if not h == 0:
+				positions[i-1] += norm * h
+				positions[i] += - norm * 2 * h
+				positions[i+1] += norm * h
 
 func resolve_collisions()->void:
 	for i:int in range(positions.size()):
