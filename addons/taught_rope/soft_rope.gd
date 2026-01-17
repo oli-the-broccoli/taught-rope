@@ -14,6 +14,9 @@ var _segment_length: float
 @export var thickness: float = 2
 @export var color: Color = Color.SADDLE_BROWN
 
+@export var collision_itterations: int = 1
+@export var resolve_collisions_while_constraining: bool = false
+
 var start_point: Vector2 = Vector2.ZERO
 
 var _prev_positions: Array[Vector2]
@@ -46,8 +49,16 @@ func _physics_process(delta: float) -> void:
 	simulate(delta)
 	#points being keyframed should be set here
 	positions[0] = start_point
+	
+	var col_period: int
+	if resolve_collisions_while_constraining:
+		col_period = 1
+	else:
+		col_period = round(itterations / collision_itterations)
 	for i:int in range(itterations):
 		constrain()
+		if (i + 1) % col_period == 0:
+			resolve_collisions()
 	calc_velocities()
 	
 	queue_redraw()
@@ -60,7 +71,6 @@ func simulate(delta:float)->void:
 
 func constrain() ->void:
 	#length constraint
-	
 	for i:int in range(1,positions.size()):
 		var segment: Vector2 = (positions[i] - positions[i-1])
 		var length: float = max(segment.length(),0.001) #too ensure not devidign by 0
@@ -71,8 +81,12 @@ func constrain() ->void:
 			positions[i] -= move
 			positions[i-1] += move
 		
+
+func resolve_collisions()->void:
+	for i:int in range(positions.size()):
 		#having no motion currently means the impact absorbs all energy
-		#node_query.motion = positions[i] - _prev_positions[i]
+		#I can't really work out how this paramater is supposed to be used correctly
+		#node_query.motion = (positions[i] - _prev_positions[i])
 		node_query.transform = Transform2D(0,positions[i])
 		var result: Dictionary = space.get_rest_info(node_query)
 		if result != {}:
