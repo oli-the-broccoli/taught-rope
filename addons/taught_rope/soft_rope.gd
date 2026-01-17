@@ -6,6 +6,8 @@ extends Node2D
 @export var gravity_scale: float = 1.0
 var _gravity: Vector2
 @export var damping: float = 1
+@export_range(0,1,0.01) var bending_stiffness: float = 0.5
+@export_range(0,PI/2,0.01) var free_bending_angle: float = 1
 
 @export var itterations: int = 10
 @export var rope_length: float = 100
@@ -57,8 +59,10 @@ func _physics_process(delta: float) -> void:
 		col_period = round(itterations / collision_itterations)
 	for i:int in range(itterations):
 		constrain()
+		resolve_bending()
 		if (i + 1) % col_period == 0:
 			resolve_collisions()
+	
 	calc_velocities()
 	
 	queue_redraw()
@@ -80,7 +84,25 @@ func constrain() ->void:
 		else:
 			positions[i] -= move
 			positions[i-1] += move
-		
+	
+
+func resolve_bending()->void:
+	if not bending_stiffness == 0:
+		for i:int in range(1,positions.size()-1):
+			var span: Vector2 = positions[i+1] - positions[i-1]
+			var segment: Vector2 = positions[i] - positions[i-1]
+			var norm: Vector2 = span.normalized().orthogonal()
+			var s: float = span.length()
+			var e: float = norm.dot(segment)
+			#max displacement of middle point from span before free bending angle is breached
+			var ef: float = _segment_length * cos((PI - free_bending_angle * _segment_length)/2)
+			var s1: float = span.dot(segment)
+			var s2: float = s - s1
+			var h: float = max(e-ef,0) * (s / max((s*s + s1*s1 + s2*s2),0.001)) * bending_stiffness
+			if not h == 0:
+				positions[i-1] += norm * s2 * h
+				positions[i] += - norm * s * h
+				positions[i+1] += norm * s1 * h
 
 func resolve_collisions()->void:
 	for i:int in range(positions.size()):
