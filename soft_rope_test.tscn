@@ -17,9 +17,12 @@ soft_rope = NodePath("SoftRope")
 
 [node name="SoftRope" type="Node2D" parent="."]
 script = ExtResource("2_63hu4")
-itterations = 100
+damping = 2.0
+bending_stiffness = 0.06
+free_bending_radius = 20.0
+itterations = 50
 rope_length = 200.0
-segments = 15
+segments = 30
 metadata/_custom_type_script = "uid://dukhop6enx3nn"
 
 [node name="Camera2D" type="Camera2D" parent="."]
