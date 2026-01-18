@@ -4,7 +4,10 @@ extends Node2D
 
 @export var rope_length: float = 100
 @export var segments: int = 10
-@export var itterations: int = 10
+@export var itterations: int = 10:
+	set(value):
+		itterations = value
+		_normalised_bending_stiffness = bending_stiffness / value
 
 @export_group('Physics')
 @export_flags_2d_physics var collision_mask: int = 1
@@ -16,8 +19,11 @@ extends Node2D
 @export var k_fc: float = 0.5
 
 @export_subgroup('Bending')
-@export_range(0,1,0.01) var bending_stiffness: float = 0.5
-@export var free_bending_radius: float = 50
+@export var bending_stiffness: float = 5:
+	set(value):
+		bending_stiffness = value
+		_normalised_bending_stiffness = bending_stiffness / itterations
+@export var free_bending_radius: float = 20
 
 @export_subgroup('Collisions')
 @export var collision_itterations: int = 1
@@ -34,6 +40,8 @@ extends Node2D
 var _gravity: Vector2
 
 var _segment_length: float 
+
+var _normalised_bending_stiffness: float = bending_stiffness / itterations
 
 var start_point: Vector2 = Vector2.ZERO
 
@@ -76,12 +84,13 @@ func _physics_process(delta: float) -> void:
 	
 	for i:int in range(itterations):
 		#points being keyframed should be set here
-		positions[0] = start_point
+		
 		constrain()
 		resolve_bending()
 		if (i + 1) % col_period == 0:
 			resolve_collisions()
-	
+		
+		positions[0] = start_point
 	
 	calc_velocities()
 	collision_normals.fill(Vector2.ZERO)
@@ -115,14 +124,17 @@ func resolve_bending()->void:
 		var ef: float = (_segment_length ** 2) / 2 / free_bending_radius
 		for i:int in range(1,positions.size()-1):
 			var span: Vector2 = positions[i+1] - positions[i-1]
-			var norm: Vector2 = (positions[i] - (positions[i-1] + span/2)).normalized()
-			#var s: float = abs(norm.orthogonal().dot(span))
-			var segment: Vector2 = positions[i] - positions[i-1]
-			var e1: float = abs(segment.dot(norm))
-			var e2: float = abs(span.dot(norm))
-			#max displacement of middle point from span before free bending angle is breached
-			var h: float = (1.0/3.0) * max((e2/2 + e1) - ef,0) * bending_stiffness
-			if not h == 0:
+			var direction: Vector2 = (positions[i] - (positions[i-1] + span/2))
+			if direction.length() > ef:
+				var norm: Vector2 = direction.normalized()
+				#var s: float = abs(norm.orthogonal().dot(span))
+				var segment: Vector2 = positions[i] - positions[i-1]
+				var e1: float = abs(segment.dot(norm))
+				var e2: float = abs(span.dot(norm))
+				var e: float = e2/2 + e1
+				#if i == segments - 1:
+					#print(e2/2, ' ', e1, ' ', e, ' ', ef)
+				var h: float = (1.0/3.0) * e * _normalised_bending_stiffness
 				positions[i-1] += norm * h
 				positions[i] += - norm * 2 * h
 				positions[i+1] += norm * h
