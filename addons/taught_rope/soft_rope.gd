@@ -2,28 +2,45 @@ class_name SoftRope
 extends Node2D
 
 
+@export var rope_length: float = 100
+@export var segments: int = 10
+@export var itterations: int = 10
+
+@export_group('Physics')
 @export_flags_2d_physics var collision_mask: int = 1
-@export var gravity_scale: float = 1.0
-var _gravity: Vector2
+@export_range(-10,10,0.5,'or_greater',"or_less") var gravity_scale: float = 1.0
+
+@export_subgroup('Friction')
 @export var damping: float = 1
+@export_range(0,1,0.01) var k_fp: float = 0.5
+@export var k_fc: float = 0.5
+
+@export_subgroup('Bending')
 @export_range(0,1,0.01) var bending_stiffness: float = 0.5
 @export var free_bending_radius: float = 50
 
-@export var itterations: int = 10
-@export var rope_length: float = 100
-@export var segments: int = 10
-var _segment_length: float 
-@export var thickness: float = 2
-@export var color: Color = Color.SADDLE_BROWN
-
+@export_subgroup('Collisions')
 @export var collision_itterations: int = 1
 @export var resolve_collisions_while_constraining: bool = false
+
+@export_group('Rendering')
+@export var draw_rope: bool = true
+@export var rope_width: float = 2
+@export var rope_color: Color = Color.SADDLE_BROWN
+@export var draw_nodes: bool = false
+@export var node_radius: float = 1
+@export var node_color: Color = Color.ORANGE
+
+var _gravity: Vector2
+
+var _segment_length: float 
 
 var start_point: Vector2 = Vector2.ZERO
 
 var _prev_positions: Array[Vector2]
 var positions: Array[Vector2]
 var velocities: Array[Vector2]
+var collision_normals: Array[Vector2]
 
 var space: PhysicsDirectSpaceState2D
 var node_query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
@@ -34,6 +51,8 @@ func _ready() -> void:
 	_prev_positions.resize(segments+1)
 	velocities.resize(segments+1)
 	velocities.fill(Vector2.ZERO)
+	collision_normals.resize(segments + 1)
+	collision_normals.fill(Vector2.ZERO)
 	_gravity = gravity_scale * ProjectSettings.get_setting('physics/2d/default_gravity_vector') * ProjectSettings.get_setting('physics/2d/default_gravity')
 	_segment_length = rope_length/segments
 	for i:int in range(positions.size()):
@@ -42,7 +61,7 @@ func _ready() -> void:
 	
 	node_query.collision_mask = collision_mask
 	var circle = CircleShape2D.new()
-	circle.radius = thickness/2
+	circle.radius = rope_width/2
 	node_query.shape = circle
 	
 
@@ -63,7 +82,9 @@ func _physics_process(delta: float) -> void:
 		if (i + 1) % col_period == 0:
 			resolve_collisions()
 	
+	
 	calc_velocities()
+	collision_normals.fill(Vector2.ZERO)
 	
 	queue_redraw()
 
@@ -95,7 +116,7 @@ func resolve_bending()->void:
 		for i:int in range(1,positions.size()-1):
 			var span: Vector2 = positions[i+1] - positions[i-1]
 			var norm: Vector2 = (positions[i] - (positions[i-1] + span/2)).normalized()
-			var s: float = abs(norm.orthogonal().dot(span))
+			#var s: float = abs(norm.orthogonal().dot(span))
 			var segment: Vector2 = positions[i] - positions[i-1]
 			var e1: float = abs(segment.dot(norm))
 			var e2: float = abs(span.dot(norm))
@@ -114,15 +135,24 @@ func resolve_collisions()->void:
 		node_query.transform = Transform2D(0,positions[i])
 		var result: Dictionary = space.get_rest_info(node_query)
 		if result != {}:
-			positions[i] = result.point + result.normal * (thickness / 2 + 0.01)
+			positions[i] = result.point + result.normal * (rope_width / 2 + 0.01)
+			collision_normals[i] = result.normal
 
 func calc_velocities()->void:
 	for i:int in range(positions.size()):
 		velocities[i] = (positions[i] - _prev_positions[i]) / self.get_physics_process_delta_time()
+		if not collision_normals[i].is_zero_approx():
+			var v_norm: Vector2 = velocities[i].dot(collision_normals[i]) * collision_normals[i]
+			var v_tan: Vector2 = velocities[i] - v_norm
+			v_tan *= (1-k_fp)
+			v_tan -= min(k_fc,v_tan.length()) * v_tan.normalized()
+			velocities[i] = v_tan + v_norm
 		_prev_positions[i] = positions[i]
 
 func _draw() -> void:
 	draw_set_transform_matrix(self.transform.inverse())
-	draw_polyline(positions,color,thickness,true)
-	for point: Vector2 in positions:
-		draw_circle(point,1,Color.YELLOW)
+	if draw_rope:
+		draw_polyline(positions,rope_color,rope_width,true)
+	if draw_nodes:
+		for point: Vector2 in positions:
+			draw_circle(point,node_radius,node_color)
