@@ -1,21 +1,22 @@
 class_name SoftRope
 extends Node2D
 
-@export var rope_length: float = 100:
+
+@export var target_rope_length: float = 100:
 	set(value):
-		rope_length = value
-		calc_segments()
+		target_rope_length = value
+		_adjust_nodes()
 
 @export var target_segment_length: float = 10:
 	set(value):
 		target_segment_length = value
-		calc_segments()
+		_adjust_nodes()
 
 @export var rope_width: float = 2:
 	set(value):
 		rope_width = value
 		if collision_radius == 0:
-			collision_circle.radius = rope_width/2
+			_collision_circle.radius = rope_width/2
 
 @export var itterations: int = 10:
 	set(value):
@@ -41,17 +42,17 @@ extends Node2D
 @export_flags_2d_physics var collision_mask: int = 1:
 	set(value):
 		collision_mask = value
-		node_query.collision_mask = value
+		_node_query.collision_mask = value
 @export var collision_itterations: int = 1
 @export var resolve_collisions_while_constraining: bool = false
 @export var collision_radius: float = 0:
 	set(value):
 		collision_radius = value
 		if value == 0:
-			collision_circle.radius = rope_width/2
+			_collision_circle.radius = rope_width/2
 		else:
-			collision_circle.radius = collision_radius
-		node_query.shape = collision_circle
+			_collision_circle.radius = collision_radius
+		_node_query.shape = _collision_circle
 
 @export_group('Rendering')
 @export var draw_rope: bool = true
@@ -60,12 +61,13 @@ extends Node2D
 @export var node_radius: float = 1
 @export var node_color: Color = Color.ORANGE
 
-var _gravity: Vector2
 
+
+var num_nodes: int
 var _segments: int
 var _segment_length: float 
-var num_nodes: int
 
+var _gravity: Vector2
 var _normalised_bending_stiffness: float = bending_stiffness / itterations
 
 var start_point: Vector2 = Vector2.ZERO
@@ -75,18 +77,59 @@ var positions: Array[Vector2]
 var velocities: Array[Vector2]
 var collision_normals: Array[Vector2]
 
-var space: PhysicsDirectSpaceState2D
-var collision_circle: CircleShape2D = CircleShape2D.new()
-var node_query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
+enum EditEnd{START,END}
+var edit_end: EditEnd = EditEnd.START
 
-func calc_segments()->void:
-	_segments = round(rope_length / target_segment_length)
-	_segment_length = rope_length / _segments
+var delta_nodes: int
+
+var _space: PhysicsDirectSpaceState2D
+var _collision_circle: CircleShape2D = CircleShape2D.new()
+var _node_query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
+
+func _calc_segments()->void:
+	_segments = round(target_rope_length / target_segment_length)
+	_segment_length = target_rope_length / _segments
 	num_nodes = _segments + 1
 
+func _adjust_nodes()->void:
+	delta_nodes = round(target_rope_length / target_segment_length) - _segments + 1
+
+func _add_nodes(num: int = 1)->void:
+	var index: int
+	if edit_end == EditEnd.START:
+		index = 0
+	else:
+		index = max(num_nodes - 2,0)
+	for n:int in range(num):
+		var k: float = (n + 1) / (num + 1)
+		var next_i = min(index + n + 1, num_nodes)
+		var pos: Vector2 = positions[index].lerp(positions[next_i],k)
+		positions.insert(next_i, pos)
+		_prev_positions.insert(next_i,pos)
+		var vel: Vector2 = velocities[index].lerp(velocities[next_i],k)
+		velocities.insert(next_i,vel)
+		collision_normals.insert(next_i,Vector2.ZERO)
+
+func _remove_nodes(num:int = 1)->void:
+	num = min(num, num_nodes - 2)
+	if edit_end == EditEnd.START:
+		for n in range(num):
+			positions.pop_front()
+			_prev_positions.pop_front()
+			velocities.pop_front()
+			collision_normals.pop_front()
+	else:
+		for n in range(num):
+			positions.pop_back()
+			_prev_positions.pop_back()
+			velocities.pop_back()
+			collision_normals.pop_back()
+
 func _ready() -> void:
-	space = get_world_2d().direct_space_state
+	_space = get_world_2d().direct_space_state
 	
+	delta_nodes = 0
+	_calc_segments()
 	positions.resize(num_nodes)
 	_prev_positions.resize(num_nodes)
 	velocities.resize(num_nodes)
@@ -95,18 +138,18 @@ func _ready() -> void:
 	collision_normals.fill(Vector2.ZERO)
 	
 	_gravity = gravity_scale * ProjectSettings.get_setting('physics/2d/default_gravity_vector') * ProjectSettings.get_setting('physics/2d/default_gravity')
-	_segment_length = rope_length/_segments
+	
 	for i:int in range(num_nodes):
 		positions[i] = Vector2(0,i * _segment_length)
 	_prev_positions = positions.duplicate(true)
 	
 	if collision_radius == 0:
-		collision_circle.radius = rope_width/2
+		_collision_circle.radius = rope_width/2
 	else:
-		collision_circle.radius = collision_radius
-	node_query.shape = collision_circle
-	
-	
+		_collision_circle.radius = collision_radius
+	_node_query.shape = _collision_circle
+
+
 
 func _physics_process(delta: float) -> void:
 	
@@ -129,6 +172,17 @@ func _physics_process(delta: float) -> void:
 	
 	_calc_velocities()
 	collision_normals.fill(Vector2.ZERO)
+	
+	#add/remove nodes
+	
+	if delta_nodes != 0:
+		if delta_nodes > 0:	
+			_add_nodes(delta_nodes)
+		elif delta_nodes < 0:
+			_remove_nodes(abs(delta_nodes))
+		delta_nodes = 0
+		_calc_segments()
+	
 	
 	queue_redraw()
 
@@ -177,10 +231,10 @@ func _resolve_collisions()->void:
 		#having no motion currently means the impact absorbs all energy
 		#I can't really work out how this paramater is supposed to be used correctly
 		#node_query.motion = (positions[i] - _prev_positions[i])
-		node_query.transform = Transform2D(0,positions[i])
-		var result: Dictionary = space.get_rest_info(node_query)
+		_node_query.transform = Transform2D(0,positions[i])
+		var result: Dictionary = _space.get_rest_info(_node_query)
 		if result != {}:
-			positions[i] = result.point + result.normal * (collision_circle.radius + 0.01)
+			positions[i] = result.point + result.normal * (_collision_circle.radius + 0.01)
 			collision_normals[i] = result.normal
 
 func _calc_velocities()->void:
