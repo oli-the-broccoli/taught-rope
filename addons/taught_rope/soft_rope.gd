@@ -165,7 +165,7 @@ func _physics_process(delta: float) -> void:
 		if (i + 1) % col_period == 0:
 			_resolve_collisions()
 		
-		_resolve_pins()
+	_resolve_pins()
 	
 	_calc_velocities()
 	collision_normals.fill(Vector2.ZERO)
@@ -242,14 +242,14 @@ func _resolve_pins()->void:
 
 		if pin.apply_rotation:
 			var delta: Vector2 = positions[i] - pos
-			positions[i] = pin.global_transform * (Vector2(-1,0) * delta.length())
+			positions[i] = positions[i].lerp(pin.global_transform * (Vector2(-1,0) * delta.length()), pin.strength)
 			delta = positions[i+1] - pos
-			positions[i + 1] = pin.global_transform * (Vector2(1,0) * delta.length())
+			positions[i + 1] = positions[i+1].lerp(pin.global_transform * (Vector2(1,0) * delta.length()), pin.strength)
 		else:
-			var delta: Vector2 = pin.global_position - pos
+			var delta: Vector2 = (pin.global_position - pos) * pin.strength
 			positions[i] += delta
 			positions[i + 1] += delta
-			
+		pass
 
 func _calc_velocities()->void:
 	for i:int in range(positions.size()):
