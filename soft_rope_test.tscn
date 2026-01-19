@@ -1,7 +1,9 @@
-[gd_scene load_steps=6 format=3 uid="uid://brkcns5ekxss2"]
+[gd_scene load_steps=8 format=3 uid="uid://brkcns5ekxss2"]
 
 [ext_resource type="Script" uid="uid://ooqa41wduwk" path="res://soft_rope_test.gd" id="1_x8yrp"]
 [ext_resource type="Script" uid="uid://dukhop6enx3nn" path="res://addons/taught_rope/soft_rope.gd" id="2_63hu4"]
+[ext_resource type="Script" uid="uid://ccts1k502x4wy" path="res://addons/taught_rope/rope_mount.gd" id="3_x7h0l"]
+[ext_resource type="Texture2D" uid="uid://bukueat5yp6sp" path="res://icon.svg" id="4_pj1kk"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_63hu4"]
 radius = 58.76
@@ -71,3 +73,13 @@ position = Vector2(0, 275)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D5"]
 shape = SubResource("WorldBoundaryShape2D_63hu4")
+
+[node name="RopeMount" type="Marker2D" parent="." node_paths=PackedStringArray("rope")]
+script = ExtResource("3_x7h0l")
+rope = NodePath("../SoftRope")
+rope_position = 0.5
+metadata/_custom_type_script = "uid://ccts1k502x4wy"
+
+[node name="Sprite2D" type="Sprite2D" parent="RopeMount"]
+scale = Vector2(0.21875, 0.21875)
+texture = ExtResource("4_pj1kk")
