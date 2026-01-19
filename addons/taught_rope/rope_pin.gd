@@ -12,8 +12,8 @@ extends Marker2D
 
 @export var rope: SoftRope
 @export_range(0,1) var rope_position: float = 1
+@export_range(0,1) var strength: float = 1
 @export var apply_rotation: bool = true
-@export var can_slide: bool = false
 
 func _ready() -> void:
 	if enabled:
