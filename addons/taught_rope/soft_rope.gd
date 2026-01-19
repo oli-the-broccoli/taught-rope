@@ -72,7 +72,7 @@ var _segment_length: float
 var _gravity: Vector2
 var _normalised_bending_stiffness: float = bending_stiffness / itterations
 
-var start_point: Vector2 = Vector2.ZERO
+var pins: Array[RopePin] = []
 
 var _prev_positions: Array[Vector2]
 var positions: Array[Vector2]
@@ -160,13 +160,12 @@ func _physics_process(delta: float) -> void:
 		col_period = round(itterations / collision_itterations)
 	
 	for i:int in range(itterations):
-		#points being keyframed should be set here
 		_constrain()
 		_resolve_bending()
 		if (i + 1) % col_period == 0:
 			_resolve_collisions()
 		
-		positions[0] = start_point
+	_resolve_pins()
 	
 	_calc_velocities()
 	collision_normals.fill(Vector2.ZERO)
@@ -196,11 +195,8 @@ func _constrain() ->void:
 		var segment: Vector2 = (positions[i] - positions[i-1])
 		var length: float = max(segment.length(),0.001) #too ensure not devidign by 0
 		var move: Vector2 = segment/length * (length - _segment_length) * 0.5 #normalise and multiply by half the error
-		if (i == 1):
-			positions[i] -= move * 2
-		else:
-			positions[i] -= move
-			positions[i-1] += move
+		positions[i] -= move
+		positions[i-1] += move
 	
 
 func _resolve_bending()->void:
@@ -234,6 +230,26 @@ func _resolve_collisions()->void:
 		if result != {}:
 			positions[i] = result.point + result.normal * (_collision_circle.radius + 0.01)
 			collision_normals[i] = result.normal
+
+func _resolve_pins()->void:
+	for pin: RopePin in pins:
+		var node: float = pin.rope_position * (num_nodes-1)
+		var i:int = int(node)
+		if i == node:
+			i = max(i-1,0)
+		var k: float = node - i
+		var pos: Vector2 = positions[i].lerp(positions[i+1],k)
+
+		if pin.apply_rotation:
+			var delta: Vector2 = positions[i] - pos
+			positions[i] = positions[i].lerp(pin.global_transform * (Vector2(-1,0) * delta.length()), pin.strength)
+			delta = positions[i+1] - pos
+			positions[i + 1] = positions[i+1].lerp(pin.global_transform * (Vector2(1,0) * delta.length()), pin.strength)
+		else:
+			var delta: Vector2 = (pin.global_position - pos) * pin.strength
+			positions[i] += delta
+			positions[i + 1] += delta
+		pass
 
 func _calc_velocities()->void:
 	for i:int in range(positions.size()):
