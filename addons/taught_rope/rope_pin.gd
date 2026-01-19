@@ -1,7 +1,8 @@
 class_name RopePin
-extends Node
+extends Marker2D
 
-@export var enabled: bool = true:
+
+@export var enabled: bool = false:
 	set(value):
 		enabled = value
 		if value:
@@ -17,9 +18,13 @@ extends Node
 func _ready() -> void:
 	if enabled:
 		_register()
+	else:
+		_deregister()
 
 func _register()->void:
-	rope.pins.append(self)
+	if rope != null:
+		rope.pins.append(self)
 
 func _deregister()->void:
-	rope.pins.erase(self)
+	if rope != null:
+		rope.pins.erase(self)
