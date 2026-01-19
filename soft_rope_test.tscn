@@ -97,7 +97,6 @@ metadata/_custom_type_script = "uid://bp0le74tn3cey"
 [node name="RopeHandle2" type="Marker2D" parent="." node_paths=PackedStringArray("rope")]
 position = Vector2(-128, 6)
 script = ExtResource("5_l0nnq")
-enabled = true
 rope = NodePath("../SoftRope")
 rope_position = 0.55
 strength = 0.285
