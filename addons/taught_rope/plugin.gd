@@ -14,9 +14,9 @@ func _disable_plugin() -> void:
 
 func _enter_tree() -> void:
 	# Initialization of the plugin goes here.
-	add_custom_type('TaughtRope','Node2D',preload("taught_rope.gd"),preload("icon.svg"))
-	add_custom_type('SoftRope','Node2D',preload("soft_rope.gd"),preload("icon.svg"))
-	add_custom_type('RopeMount','Marker2D',preload("rope_mount.gd"),preload("icon.svg"))
+	add_custom_type('TaughtRope','Node2D',preload("taught_rope.gd"),preload("icons/taut_rope.png"))
+	add_custom_type('SoftRope','Node2D',preload("soft_rope.gd"),preload("icons/soft_rope.png"))
+	add_custom_type('RopeMount','Marker2D',preload("rope_mount.gd"),preload("icons/rope_mount.png"))
 
 
 func _exit_tree() -> void:
