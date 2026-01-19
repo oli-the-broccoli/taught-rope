@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dehbwq5aeemxk"
-path="res://.godot/imported/icon.svg-6f6a556102cda969879200d85fe422f1.ctex"
+uid="uid://bfho70vs68uim"
+path="res://.godot/imported/taut_rope.png-521d70cb99777cbe4e5f7e4ad3fd8e26.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://addons/taught_rope/icon.svg"
-dest_files=["res://.godot/imported/icon.svg-6f6a556102cda969879200d85fe422f1.ctex"]
+source_file="res://addons/taught_rope/icons/taut_rope.png"
+dest_files=["res://.godot/imported/taut_rope.png-521d70cb99777cbe4e5f7e4ad3fd8e26.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

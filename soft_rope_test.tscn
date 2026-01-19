@@ -1,0 +1,112 @@
+[gd_scene load_steps=9 format=3 uid="uid://brkcns5ekxss2"]
+
+[ext_resource type="Script" uid="uid://ooqa41wduwk" path="res://soft_rope_test.gd" id="1_x8yrp"]
+[ext_resource type="Script" uid="uid://dukhop6enx3nn" path="res://addons/taught_rope/soft_rope.gd" id="2_63hu4"]
+[ext_resource type="Script" uid="uid://ccts1k502x4wy" path="res://addons/taught_rope/rope_mount.gd" id="3_x7h0l"]
+[ext_resource type="Texture2D" uid="uid://bukueat5yp6sp" path="res://icon.svg" id="4_pj1kk"]
+[ext_resource type="Script" uid="uid://bp0le74tn3cey" path="res://addons/taught_rope/rope_pin.gd" id="5_l0nnq"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_63hu4"]
+radius = 58.76
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_63hu4"]
+size = Vector2(146.43, 20)
+
+[sub_resource type="WorldBoundaryShape2D" id="WorldBoundaryShape2D_63hu4"]
+
+[node name="SoftRopeTest" type="Node2D" node_paths=PackedStringArray("soft_rope")]
+script = ExtResource("1_x8yrp")
+soft_rope = NodePath("SoftRope")
+
+[node name="SoftRope" type="Node2D" parent="."]
+script = ExtResource("2_63hu4")
+target_rope_length = 300.0
+target_segment_length = 30.0
+rope_width = 3.0
+itterations = 50
+damping = 2.0
+k_fc = 5.0
+collision_itterations = 10
+resolve_collisions_while_constraining = true
+draw_nodes = true
+metadata/_custom_type_script = "uid://dukhop6enx3nn"
+
+[node name="Camera2D" type="Camera2D" parent="."]
+
+[node name="RigidBody2D" type="RigidBody2D" parent="."]
+position = Vector2(-262, 27)
+gravity_scale = 0.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RigidBody2D"]
+shape = SubResource("CircleShape2D_63hu4")
+
+[node name="StaticBody2D" type="StaticBody2D" parent="."]
+position = Vector2(194, 66)
+rotation = -0.5325432
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D"]
+shape = SubResource("RectangleShape2D_63hu4")
+
+[node name="StaticBody2D3" type="StaticBody2D" parent="."]
+position = Vector2(-147, 137)
+rotation = 0.036135674
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D3"]
+rotation = -0.0051262826
+shape = SubResource("RectangleShape2D_63hu4")
+
+[node name="StaticBody2D4" type="StaticBody2D" parent="."]
+position = Vector2(16.999985, 158.00002)
+rotation = -0.030200526
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D4"]
+rotation = -0.0051262826
+shape = SubResource("RectangleShape2D_63hu4")
+
+[node name="StaticBody2D2" type="StaticBody2D" parent="."]
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="StaticBody2D2"]
+polygon = PackedVector2Array(167, -192, 57, -99, 193, -47, 289, -105, 333, 155, 361, -111, 340, -244, 328, -134)
+
+[node name="StaticBody2D5" type="StaticBody2D" parent="."]
+position = Vector2(0, 275)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D5"]
+shape = SubResource("WorldBoundaryShape2D_63hu4")
+
+[node name="RopeMount" type="Marker2D" parent="." node_paths=PackedStringArray("rope")]
+script = ExtResource("3_x7h0l")
+rope = NodePath("../SoftRope")
+rope_position = 0.5
+metadata/_custom_type_script = "uid://ccts1k502x4wy"
+
+[node name="Sprite2D" type="Sprite2D" parent="RopeMount"]
+visible = false
+scale = Vector2(0.21875, 0.21875)
+texture = ExtResource("4_pj1kk")
+
+[node name="RopeHandle" type="Marker2D" parent="." node_paths=PackedStringArray("rope")]
+position = Vector2(-128, 6)
+script = ExtResource("5_l0nnq")
+enabled = true
+rope = NodePath("../SoftRope")
+rope_position = 0.0
+apply_rotation = false
+metadata/_custom_type_script = "uid://bp0le74tn3cey"
+
+[node name="RopeHandle2" type="Marker2D" parent="." node_paths=PackedStringArray("rope")]
+position = Vector2(-128, 6)
+script = ExtResource("5_l0nnq")
+enabled = true
+rope = NodePath("../SoftRope")
+rope_position = 0.55
+strength = 0.285
+metadata/_custom_type_script = "uid://bp0le74tn3cey"
+
+[node name="RopeHandle3" type="Marker2D" parent="." node_paths=PackedStringArray("rope")]
+position = Vector2(-65, -84)
+script = ExtResource("5_l0nnq")
+rope = NodePath("../SoftRope")
+rope_position = 0.218
+apply_rotation = false
+metadata/_custom_type_script = "uid://bp0le74tn3cey"

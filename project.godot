@@ -11,9 +11,9 @@ config_version=5
 [application]
 
 config/name="taught rope"
-run/main_scene="uid://c76517rs4di3t"
+run/main_scene="uid://brkcns5ekxss2"
 config/features=PackedStringArray("4.5", "GL Compatibility")
-config/icon="res://addons/taught_rope/icon.svg"
+config/icon="res://addons/taught_rope/icons/icon.svg"
 
 [debug]
 

@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://c2p627esmlv5y"]
+
+[ext_resource type="Script" uid="uid://bop0bnjr8wc3t" path="res://drawing_scene.gd" id="1_m5uag"]
+
+[node name="DrawingScene" type="Node2D"]
+script = ExtResource("1_m5uag")
+
+[node name="Camera2D" type="Camera2D" parent="."]
