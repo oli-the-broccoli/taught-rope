@@ -4,12 +4,12 @@ extends Node2D
 
 @export var target_rope_length: float = 100:
 	set(value):
-		target_rope_length = value
+		target_rope_length = max(value,0)
 		_adjust_nodes()
 
 @export var target_segment_length: float = 10:
 	set(value):
-		target_segment_length = value
+		target_segment_length = max(value,0)
 		_adjust_nodes()
 
 @export var rope_width: float = 2:
@@ -22,6 +22,8 @@ extends Node2D
 	set(value):
 		itterations = value
 		_normalised_bending_stiffness = bending_stiffness / value
+
+@export var edit_start: bool = true
 
 @export_group('Physics')
 @export_range(-10,10,0.5,'or_greater',"or_less") var gravity_scale: float = 1.0
@@ -77,26 +79,23 @@ var positions: Array[Vector2]
 var velocities: Array[Vector2]
 var collision_normals: Array[Vector2]
 
-enum EditEnd{START,END}
-var edit_end: EditEnd = EditEnd.START
-
-var delta_nodes: int
+var _delta_nodes: int
 
 var _space: PhysicsDirectSpaceState2D
 var _collision_circle: CircleShape2D = CircleShape2D.new()
 var _node_query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
 
 func _calc_segments()->void:
-	_segments = round(target_rope_length / target_segment_length)
+	_segments = max(round(target_rope_length / target_segment_length),1)
 	_segment_length = target_rope_length / _segments
 	num_nodes = _segments + 1
 
 func _adjust_nodes()->void:
-	delta_nodes = round(target_rope_length / target_segment_length) - _segments + 1
+	_delta_nodes = max(round(target_rope_length / target_segment_length),1) - _segments
 
 func _add_nodes(num: int = 1)->void:
 	var index: int
-	if edit_end == EditEnd.START:
+	if edit_start:
 		index = 0
 	else:
 		index = max(num_nodes - 2,0)
@@ -112,7 +111,7 @@ func _add_nodes(num: int = 1)->void:
 
 func _remove_nodes(num:int = 1)->void:
 	num = min(num, num_nodes - 2)
-	if edit_end == EditEnd.START:
+	if edit_start:
 		for n in range(num):
 			positions.pop_front()
 			_prev_positions.pop_front()
@@ -128,7 +127,7 @@ func _remove_nodes(num:int = 1)->void:
 func _ready() -> void:
 	_space = get_world_2d().direct_space_state
 	
-	delta_nodes = 0
+	_delta_nodes = 0
 	_calc_segments()
 	positions.resize(num_nodes)
 	_prev_positions.resize(num_nodes)
@@ -162,7 +161,6 @@ func _physics_process(delta: float) -> void:
 	
 	for i:int in range(itterations):
 		#points being keyframed should be set here
-		
 		_constrain()
 		_resolve_bending()
 		if (i + 1) % col_period == 0:
@@ -175,12 +173,12 @@ func _physics_process(delta: float) -> void:
 	
 	#add/remove nodes
 	
-	if delta_nodes != 0:
-		if delta_nodes > 0:	
-			_add_nodes(delta_nodes)
-		elif delta_nodes < 0:
-			_remove_nodes(abs(delta_nodes))
-		delta_nodes = 0
+	if _delta_nodes != 0:
+		if _delta_nodes > 0:	
+			_add_nodes(_delta_nodes)
+		elif _delta_nodes < 0:
+			_remove_nodes(abs(_delta_nodes))
+		_delta_nodes = 0
 		_calc_segments()
 	
 	
