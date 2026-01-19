@@ -19,7 +19,7 @@ func _ready() -> void:
 		_register()
 
 func _register()->void:
-	pass
+	rope.pins.append(self)
 
 func _deregister()->void:
-	pass
+	rope.pins.erase(self)
