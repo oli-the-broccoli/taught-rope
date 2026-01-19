@@ -73,6 +73,7 @@ var _gravity: Vector2
 var _normalised_bending_stiffness: float = bending_stiffness / itterations
 
 var start_point: Vector2 = Vector2.ZERO
+var pins: Array[RopePin]
 
 var _prev_positions: Array[Vector2]
 var positions: Array[Vector2]
@@ -160,7 +161,6 @@ func _physics_process(delta: float) -> void:
 		col_period = round(itterations / collision_itterations)
 	
 	for i:int in range(itterations):
-		#points being keyframed should be set here
 		_constrain()
 		_resolve_bending()
 		if (i + 1) % col_period == 0:
@@ -196,11 +196,11 @@ func _constrain() ->void:
 		var segment: Vector2 = (positions[i] - positions[i-1])
 		var length: float = max(segment.length(),0.001) #too ensure not devidign by 0
 		var move: Vector2 = segment/length * (length - _segment_length) * 0.5 #normalise and multiply by half the error
-		if (i == 1):
-			positions[i] -= move * 2
-		else:
-			positions[i] -= move
-			positions[i-1] += move
+		#if (i == 1):
+			#positions[i] -= move * 2
+		#else:
+		positions[i] -= move
+		positions[i-1] += move
 	
 
 func _resolve_bending()->void:
