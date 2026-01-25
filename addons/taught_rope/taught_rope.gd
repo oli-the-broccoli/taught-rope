@@ -44,6 +44,7 @@ class WrappedObject:
 	
 	## calcs wrap angle and returns true if the object should be released
 	func calc_turns()->void:
+		#TODO could probably replace orth dot with a cross product to skip calculating orthogonal
 		#orth dot describes which side of normal 1 does normal 2 lie, ie CC or CCW
 		var orth_dot: int = sign(normal1.orthogonal().dot(normal2))
 		if orth_dot == 0:
@@ -63,6 +64,9 @@ class WrappedObject:
 	func get_global_transform()->Transform2D:
 		return collider.global_transform * PhysicsServer2D.body_get_shape_transform(rid,shape)
 
+class wrapped_poly extends WrappedObject:
+	var points: Array[Vector2]
+
 func _ready() -> void:
 	space = get_world_2d().direct_space_state
 	rope_start = self.global_position
@@ -72,7 +76,6 @@ func _ready() -> void:
 	wrapped_objects.append(WrappedObject.new())
 	global_points.append(rope_end)
 	prev_global_points = global_points.duplicate()
-	
 	
 	#if CCD_group != null:
 		#get_tree().get_nodes_in_group(CCD_group)
@@ -88,64 +91,62 @@ func _physics_process(delta: float) -> void:
 	
 	global_points[0] = rope_start
 	global_points[-1] = rope_end
-	
-	if detection_type == DetectionType.RAYCAST:
-		
 
-		var curr_object: WrappedObject = wrapped_objects[0]
-		#var next_object: WrappedObject = wrapped_objects[1]
-		for i:int in range(1,wrapped_objects.size() - 1):
-			var point_i = i * 2 - 1
-			#var prev_object: WrappedObject = curr_object
-			curr_object = wrapped_objects[i]
-			#next_object = wrapped_objects[i+1]
-			
-			#find next tangent points
-			var point: Rect2 = calc_tangent(curr_object,global_points[point_i-1],curr_object.normal1)
-			global_points[point_i] = point.position
-			curr_object.normal1 = point.size
-			point = calc_tangent(curr_object,global_points[point_i+2],curr_object.normal2)
-			global_points[point_i+1] = point.position
-			curr_object.normal2 = point.size
-			
-			curr_object.calc_turns()
-			if curr_object.turns < 0:
-				# release object
-				unwrap_queue.append(curr_object)
-				
-			
-		for object:WrappedObject in unwrap_queue:
-			var object_i = wrapped_objects.find(object)
-			var point_i: int = 2 * object_i - 1
-			global_points.remove_at(point_i)
-			global_points.remove_at(point_i)
-			wrapped_objects.remove_at(object_i)
-		unwrap_queue.clear()
+	var curr_object: WrappedObject = wrapped_objects[0]
+	#var next_object: WrappedObject = wrapped_objects[1]
+	for i:int in range(1,wrapped_objects.size() - 1):
+		var point_i = i * 2 - 1
+		#var prev_object: WrappedObject = curr_object
+		curr_object = wrapped_objects[i]
+		#next_object = wrapped_objects[i+1]
 		
-		for i:int in range(1, wrapped_objects.size()):
-			var point_i = i * 2 - 1
-			#cast ray back to previous object
-			var exclude: Array[RID] = [wrapped_objects[i-1].rid,wrapped_objects[i].rid]
-			var collision_result: Dictionary = cast_ray(global_points[point_i],global_points[point_i - 1],exclude)
-			if collision_result != {}:
-				var new_object: WrappedObject = collision_result.object
-				var normal: Vector2 = calc_normal(collision_result.line_pos, collision_result.position, point_i - 1, new_object)
-				var point1: Rect2 = calc_tangent(new_object,global_points[point_i - 1],normal)
-				var point2: Rect2 = calc_tangent(new_object,global_points[point_i],normal)
-				new_object.prev_orth_dot = sign(point1.size.orthogonal().dot(point2.size))
-				if new_object.prev_orth_dot == 0:
-					#the normals point same direction so we cant determine the wrap direction
-					#cancel creating the object, the next itteration should hopefully catch when the rope is deeper in the object
-					#and a non zero angle between normals will be made
-					continue
-				global_points.insert(point_i,point1.position)
-				new_object.normal1 = point1.size
-				global_points.insert(point_i+1,point2.position)
-				new_object.normal2 = point2.size
-				new_object.prev_dot = new_object.normal1.dot(new_object.normal2)
-				#get the initial wrap direction +ve for CW and -ve for CCW
-				new_object.direction = - new_object.prev_orth_dot
-				wrapped_objects.insert(i,new_object)
+		#find next tangent points
+		var point: Rect2 = calc_tangent(curr_object,global_points[point_i-1],curr_object.normal1)
+		global_points[point_i] = point.position
+		curr_object.normal1 = point.size
+		point = calc_tangent(curr_object,global_points[point_i+2],curr_object.normal2)
+		global_points[point_i+1] = point.position
+		curr_object.normal2 = point.size
+		
+		curr_object.calc_turns()
+		if curr_object.turns < 0:
+			# release object
+			unwrap_queue.append(curr_object)
+			
+		
+	for object:WrappedObject in unwrap_queue:
+		var object_i = wrapped_objects.find(object)
+		var point_i: int = 2 * object_i - 1
+		global_points.remove_at(point_i)
+		global_points.remove_at(point_i)
+		wrapped_objects.remove_at(object_i)
+	unwrap_queue.clear()
+	
+	for i:int in range(1, wrapped_objects.size()):
+		var point_i = i * 2 - 1
+		#cast ray back to previous object
+		var exclude: Array[RID] = [wrapped_objects[i-1].rid,wrapped_objects[i].rid]
+		var collision_result: Dictionary = cast_ray(global_points[point_i],global_points[point_i - 1],exclude)
+		if collision_result != {}:
+			var new_object: WrappedObject = collision_result.object
+			var normal: Vector2 = calc_normal(collision_result.line_pos, collision_result.position, point_i - 1, new_object)
+			var point1: Rect2 = calc_tangent(new_object,global_points[point_i - 1],normal)
+			var point2: Rect2 = calc_tangent(new_object,global_points[point_i],normal)
+			new_object.prev_orth_dot = sign(point1.size.orthogonal().dot(point2.size))
+			if new_object.prev_orth_dot == 0:
+				#the normals point same direction so we cant determine the wrap direction
+				#cancel creating the object, the next itteration should hopefully catch when the rope is deeper in the object
+				#and a non zero angle between normals will be made
+				print('abort')
+				continue
+			global_points.insert(point_i,point1.position)
+			new_object.normal1 = point1.size
+			global_points.insert(point_i+1,point2.position)
+			new_object.normal2 = point2.size
+			new_object.prev_dot = new_object.normal1.dot(new_object.normal2)
+			#get the initial wrap direction +ve for CW and -ve for CCW
+			new_object.direction = - new_object.prev_orth_dot
+			wrapped_objects.insert(i,new_object)
 	
 	prev_global_points = global_points.duplicate()
 	queue_redraw()
@@ -177,17 +178,45 @@ func calc_tangent(object:WrappedObject, from:Vector2, normal:Vector2)->Rect2:
 			var radius: float = PhysicsServer2D.shape_get_data(object.shape_rid)
 			var center: Vector2 = object.get_global_transform().origin
 			var from_center: Vector2 = (from - center)
-			var angle: float = acos(radius/from_center.length()) * sign(from_center.angle_to(normal))
+			var angle: float = acos(radius/from_center.length()) * sign(from_center.cross(normal))
 			result.size = from_center.normalized().rotated(angle)
 			result.position = center + result.size * radius
 		PhysicsServer2D.ShapeType.SHAPE_CAPSULE:
 			pass
 		PhysicsServer2D.ShapeType.SHAPE_RECTANGLE:
 			pass
-		PhysicsServer2D.ShapeType.SHAPE_CONCAVE_POLYGON:
-			pass
+		PhysicsServer2D.ShapeType.SHAPE_CONVEX_POLYGON:
+			var poly_points: PackedVector2Array = PhysicsServer2D.shape_get_data(object.shape_rid)
+			var high:int = poly_points.size() - 1
+			var low:int = 0
+			var mid: int = low + (high - low)/2
+			var inside: Vector2 = (poly_points[0] + poly_points[mid]) / 2
+			debug_vector(inside,from)
+			var side: int = sign((from - inside).cross(normal))
+			for i:int in range(poly_points.size()):
+				var rope: Vector2 = (poly_points[i] - from)
+				var prev: int = sign(rope.cross(poly_points[i-1]-from))
+				var next: int = sign(rope.cross(poly_points[wrap(i+1,0,poly_points.size()-1)]-from))
+				if prev == side and next == side:
+					mid = i
+					break
+			#while high > low:
+				#mid = low + (high - low) / 2
+				#var rope: Vector2 = (poly_points[mid] - from)
+				#debug_vector(poly_points[mid],from)
+				#var prev: int = sign(rope.cross(poly_points[mid-1]-from))
+				#var next: int = sign(rope.cross(poly_points[mid+1]-from))
+				#if prev == side and next == side:
+					#break
+				#elif next != side:
+					#low = mid + 1
+				#elif prev != side:
+					#high = mid - 1
+			result.position = poly_points[mid]
+			result.size = (result.position - from).orthogonal() * side
+			debug_vector(result.position, result.position + result.size * 1.5)
 		_:
-			print("shape type not handled")
+			print("shape type: ",shape_type , " not handled")
 	
 	return result
 
@@ -226,6 +255,7 @@ func _draw() -> void:
 	for vector in debug_vectors:
 		draw_line(vector.position,vector.size,Color.WEB_PURPLE)
 	debug_vectors.clear()
+	
 
 func calc_global_points()->void:
 	global_points.clear()
