@@ -1,4 +1,4 @@
-class_name TaughtRope
+class_name TautRope
 extends Node2D
 
 enum DetectionType{RAYCAST, SEGEMENT_CAST, AREA_CCD}
@@ -50,7 +50,9 @@ class WrappedObject:
 	func calc_turns()->void:
 		#TODO could probably replace orth dot with a cross product to skip calculating orthogonal
 		#orth dot describes which side of normal 1 does normal 2 lie, ie CC or CCW
-		#TODO now that we are storing points in this object may be able to do this logic without normals
+		#TODO now that we are storing points in this object may be able to do this logic without normals,
+		# we would still need some form of direction, could get previous objects positions but thats difficult inside this object
+		# so it wouldnt be much different if we tracked normals or rope direction. leave as is?
 		var orth_dot: int = sign(normal1.orthogonal().dot(normal2))
 		if orth_dot == 0:
 			return
@@ -113,11 +115,12 @@ func _physics_process(delta: float) -> void:
 	unwrap_queue.clear()
 	
 	for i:int in range(1, wrapped_objects.size()):
-		#cast ray back to previous object
+		
 		var collision_point: Vector2
 		var collision_object: WrappedObject = WrappedObject.new()
 		var exclude: Array[RID] = [wrapped_objects[i-1].rid,wrapped_objects[i].rid]
 		if detection_type == DetectionType.RAYCAST:
+			#cast ray back to previous object
 			var result: Dictionary = cast_ray(wrapped_objects[i].point1, wrapped_objects[i-1].point2,exclude)
 			if result == {}:
 				continue
@@ -126,6 +129,7 @@ func _physics_process(delta: float) -> void:
 				collision_point = result.position
 				collision_object = result.object
 		elif detection_type == DetectionType.SEGEMENT_CAST:
+			#cast segment back to previous object
 			var result: Dictionary = cast_segment(wrapped_objects[i].point1, wrapped_objects[i-1].point2,exclude)
 			if result == {}:
 				continue
