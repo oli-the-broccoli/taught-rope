@@ -191,6 +191,11 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
 	var shape_type = PhysicsServer2D.shape_get_type(object.shape_rid)
 	# note that a rect is used to store a position and a normal (in the size)
 	var result: Rect2 = Rect2(Vector2.ZERO,Vector2.ZERO)
+	var point: Vector2
+	if first_point:
+		point = object.point1
+	else:
+		point = object.point2
 	match shape_type:
 		PhysicsServer2D.ShapeType.SHAPE_CIRCLE:
 			var radius: float = PhysicsServer2D.shape_get_data(object.shape_rid)
