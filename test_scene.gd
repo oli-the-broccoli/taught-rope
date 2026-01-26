@@ -1,6 +1,6 @@
 extends Node2D
 
-@export var rope: TaughtRope
+@export var rope: TautRope
 @export var rope_speed: float = 100
 
 func _process(delta: float) -> void:

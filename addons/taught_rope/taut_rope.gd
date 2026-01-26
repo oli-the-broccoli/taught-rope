@@ -40,6 +40,9 @@ class WrappedObject:
 	var normal2: Vector2
 	var prev_point1: Vector2
 	var prev_point2: Vector2
+	#using vector2i here will limit the size of polygon collision shapes to have 2^32 points. They should probably never be bigger anyway
+	var tangents1: Vector2i = Vector2i.ZERO
+	var tangents2: Vector2i = Vector2i.ZERO
 	# here using the dot product as its cheeper than calculating angles
 	var prev_dot: float
 	var prev_orth_dot: int
@@ -193,10 +196,15 @@ func cast_segment(from: Vector2, to: Vector2, exclude: Array[RID])->Dictionary:
 		
 
 ## returns a rect2 with the size represnting the tangent normal
-func calc_tangent(object:WrappedObject, from:Vector2, point:Vector2)->Rect2:
+func calc_tangent(object:WrappedObject, from:Vector2, first_point:bool)->Rect2:
 	var shape_type = PhysicsServer2D.shape_get_type(object.shape_rid)
 	# note that a rect is used to store a position and a normal (in the size)
 	var result: Rect2 = Rect2(Vector2.ZERO,Vector2.ZERO)
+	var point: Vector2
+	if first_point:
+		point = object.point1
+	else:
+		point = object.point2
 	match shape_type:
 		PhysicsServer2D.ShapeType.SHAPE_CIRCLE:
 			var radius: float = PhysicsServer2D.shape_get_data(object.shape_rid)
@@ -211,40 +219,44 @@ func calc_tangent(object:WrappedObject, from:Vector2, point:Vector2)->Rect2:
 			pass
 		PhysicsServer2D.ShapeType.SHAPE_CONVEX_POLYGON:
 			var poly_points: PackedVector2Array = PhysicsServer2D.shape_get_data(object.shape_rid)
-			var high:int = poly_points.size() - 1
-			var low:int = 0
-			var mid: int = low + (high - low)/2
-			var inside: Vector2 = (poly_points[0] + poly_points[mid]) / 2
-			debug_vector(inside,from)
-			#var side: int = sign((from - inside).cross(normal))
-			#for i:int in range(poly_points.size()):
-				#var rope: Vector2 = (poly_points[i] - from)
-				#var prev: int = sign(rope.cross(poly_points[i-1]-from))
-				#var next: int = sign(rope.cross(poly_points[wrap(i+1,0,poly_points.size()-1)]-from))
-				#if prev == side and next == side:
-					#mid = i
-					#break
+			var tangents: Vector2i
+			if first_point:
+				tangents = object.tangents1
+			else:
+				tangents = object.tangents2
+			var rope: Vector2 = point - from
+			var i1: int = _find_tangent(tangents[0], from, 1, poly_points)
+			var p1: Vector2 = poly_points[i1]
+			var i2: int = _find_tangent(tangents[0], from, 1, poly_points)
+			var p2: Vector2 = poly_points[i2]
+			if rope.dot(p1 - from) < rope.dot(p2 - from):
+				result.position = p2
+				#result.size = (result.position - from).orthogonal()
+			else:
+				result.position = p1
 			
-			#while high > low:
-				#mid = low + (high - low) / 2
-				#var rope: Vector2 = (poly_points[mid] - from)
-				#debug_vector(poly_points[mid],from)
-				#var prev: int = sign(rope.cross(poly_points[mid-1]-from))
-				#var next: int = sign(rope.cross(poly_points[mid+1]-from))
-				#if prev == side and next == side:
-					#break
-				#elif next != side:
-					#low = mid + 1
-				#elif prev != side:
-					#high = mid - 1
-			
-			#result.position = poly_points[mid]
-			#result.size = (result.position - from).orthogonal() * side
-			#debug_vector(result.position, result.position + result.size * 1.5)
+			#object.tangents = Vector2i(i1,i2)
+			return result
 		_:
 			print("shape type: ",shape_type , " not handled")
 	
 	return result
+
+func _find_tangent(start_i:int, from: Vector2, side:int, points: PackedVector2Array)->int:
+	#most of the start_i is going to be correct so should optimise to return it quickly
+	var size: int = points.size()
+	for n: int in range(1,ceil((size + 1)/2)):
+		var i: int = (n >> 1) ^ ( -(n & 1)) #funky way of making the sequence 0, -1, 1, -2, 2 #https://stackoverflow.com/questions/2210923/zig-zag-decoding
+		#this one needs to be positive
+		i = posmod(n + start_i, size)
+		#modulus operation to wrap
+		var next_i = (i + 1) % size
+		var rope: Vector2 = (points[i] - from)
+		var prev: int = sign(rope.cross(points[i - 1]-from))
+		var next: int = sign(rope.cross(points[next_i]-from))
+		if prev == side and next == side:
+			return i
+	return -1
 
 func calc_normal(line_pos:float,collision_position:Vector2,index:int, col_object: WrappedObject)->Vector2:
 	var object: WrappedObject = wrapped_objects[index]
