@@ -58,6 +58,7 @@ class WrappedObject:
 			if  dot < 0:
 				#if the directions are pointing opposite a full turn (not half turn) has been completed
 				turns += cross * direction
+				
 		prev_cross = cross
 	
 	## returns the sign of the cross product between the tangent directions
@@ -65,7 +66,7 @@ class WrappedObject:
 		return sign(point1.direction.cross(point2.direction))
 	
 	## returns the dot product between the tangent directions
-	func directional_dot() -> int:
+	func directional_dot() -> float:
 		return point1.direction.dot(point2.direction)
 	
 	func get_global_transform()->Transform2D:
@@ -138,7 +139,9 @@ func _physics_process(delta: float) -> void:
 				collision_object.shape = result.shape
 		
 		collision_object.point1.position = collision_point
+		collision_object.point1.direction = wrapped_objects[i-1].point2.position - collision_point
 		collision_object.point2.position = collision_point
+		collision_object.point2.direction = wrapped_objects[i].point1.position - collision_point
 		calc_tangent(collision_object, wrapped_objects[i-1].point2.position, collision_object.point1)
 		calc_tangent(collision_object, wrapped_objects[i].point1.position, collision_object.point2)
 		collision_object.prev_cross = collision_object.directional_cross()
@@ -199,7 +202,7 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
 			var from_center: Vector2 = (from - center)
 			var angle: float = acos(radius/from_center.length()) * sign(from_center.cross(point.position - center))
 			point.position = center + from_center.normalized().rotated(angle) * radius
-			point.direction = from - point.position
+			point.direction = (from - point.position).normalized()
 			return true
 		PhysicsServer2D.ShapeType.SHAPE_CAPSULE:
 			pass
@@ -211,15 +214,21 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
 			var prev_direction: Vector2 = point.direction
 			var i1: int = _find_tangent(indices[0], from, 1, poly_points)
 			var p1: Vector2 = poly_points[i1]
-			var i2: int = _find_tangent(indices[0], from, -1, poly_points)
+			var d1: Vector2 = (from - p1).normalized()
+			var i2: int = _find_tangent(indices[1], from, -1, poly_points)
 			var p2: Vector2 = poly_points[i2]
-			if prev_direction.dot(from - p1) < prev_direction.dot(from - p2):
+			var d2: Vector2 = (from - p2).normalized()
+			#debug_vector(p1,from)
+			#debug_vector(p2,from)
+			#debug_vector(point.position, point.position - prev_direction * 10)
+			#print(prev_direction.dot((from - p1).normalized()), ' ', prev_direction.dot((from - p2).normalized()))
+			if prev_direction.dot(d1) < prev_direction.dot(d2):
 				point.position = p2
-				point.direction = from - p2
+				point.direction = (from - p2).normalized()
 				point.tangent_indices = Vector2i(i2,i1)
 			else:
-				result.position = p1
-				point.direction = from - p1
+				point.position = p1
+				point.direction = (from - p1).normalized()
 				point.tangent_indices = Vector2i(i1,i2)
 			return true
 		_:
@@ -230,16 +239,16 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
 func _find_tangent(start_i:int, from: Vector2, side:int, points: PackedVector2Array)->int:
 	#most of the start_i is going to be correct so should optimise to return it quickly
 	var size: int = points.size()
-	for n: int in range(1,ceil((size + 1)/2)):
+	for n: int in range(size):
 		var i: int = (n >> 1) ^ ( -(n & 1)) #funky way of making the sequence 0, -1, 1, -2, 2... #https://stackoverflow.com/questions/2210923/zig-zag-decoding
 		#can be read as (n div 2 ) * -1 ^ (n mod 2) in algebraic terms
 		#this one needs to be positive
-		i = posmod(n + start_i, size)
+		i = posmod(i + start_i, size)
 		#modulus operation to wrap
 		var next_i = (i + 1) % size
 		var rope: Vector2 = (points[i] - from)
-		var prev: int = sign(rope.cross(points[i - 1]-from))
-		var next: int = sign(rope.cross(points[next_i]-from))
+		var prev: int = sign(rope.cross(points[i - 1] - from))
+		var next: int = sign(rope.cross(points[next_i] - from))
 		if prev == side and next == side:
 			return i
 	return -1
@@ -279,7 +288,7 @@ func _draw() -> void:
 	for point: Vector2 in global_points:
 		draw_circle(point,1,Color.WEB_GREEN,true)
 	for vector in debug_vectors:
-		draw_line(vector.position,vector.size,Color.WEB_PURPLE)
+		draw_line(vector.position,vector.size,Color.WHITE)
 	debug_vectors.clear()
 	
 
