@@ -53,4 +53,5 @@ shape = SubResource("CircleShape2D_2nij2")
 [node name="StaticBody2D4" type="StaticBody2D" parent="."]
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="StaticBody2D4"]
+position = Vector2(-34, -8)
 polygon = PackedVector2Array(-29, -66, -51, -57, -55, -32, -34, -22, -11, -17, 13, -21, 23, -35, -2, -57)

@@ -210,39 +210,41 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
 			pass
 		PhysicsServer2D.ShapeType.SHAPE_CONVEX_POLYGON:
 			var poly_points: PackedVector2Array = PhysicsServer2D.shape_get_data(object.shape_rid)
-			var indices: Vector2i = point.tangent_indices
 			var prev_direction: Vector2 = point.direction
-			var i1: int = _find_tangent(indices[0], from, 1, poly_points)
-			var p1: Vector2 = poly_points[i1]
+			var poly_trans: Transform2D = object.get_global_transform()
+			#find first tangent
+			var from_p: Vector2 = from * poly_trans
+			var i1: int = _find_tangent(point.tangent_indices[0], from_p, 1, poly_points)
+			var p1: Vector2 = poly_trans * poly_points[i1]
 			var d1: Vector2 = (from - p1).normalized()
-			var i2: int = _find_tangent(indices[1], from, -1, poly_points)
-			var p2: Vector2 = poly_points[i2]
+			#find second tangent
+			var i2: int = _find_tangent(point.tangent_indices[1], from_p, -1, poly_points)
+			var p2: Vector2 = poly_trans * poly_points[i2]
 			var d2: Vector2 = (from - p2).normalized()
-			#debug_vector(p1,from)
-			#debug_vector(p2,from)
-			#debug_vector(point.position, point.position - prev_direction * 10)
-			#print(prev_direction.dot((from - p1).normalized()), ' ', prev_direction.dot((from - p2).normalized()))
-			if prev_direction.dot(d1) < prev_direction.dot(d2):
-				point.position = p2
-				point.direction = (from - p2).normalized()
-				point.tangent_indices = Vector2i(i2,i1)
-			else:
+			#choose tangent that best aligns with previous direction (tangent)
+			if prev_direction.dot(d2) < prev_direction.dot(d1):
 				point.position = p1
 				point.direction = (from - p1).normalized()
 				point.tangent_indices = Vector2i(i1,i2)
+			else:
+				point.position = p2
+				point.direction = (from - p2).normalized()
+				point.tangent_indices = Vector2i(i2,i1)
 			return true
 		_:
 			print("shape type: ",shape_type , " not handled")
 	
 	return false
 
+## finds a tangent to the convex polygon given by points to the vector from. starts searching at the start_i index.
+## returns -1 if no tangent is found ie, from is inside the polygon
 func _find_tangent(start_i:int, from: Vector2, side:int, points: PackedVector2Array)->int:
 	#most of the start_i is going to be correct so should optimise to return it quickly
 	var size: int = points.size()
 	for n: int in range(size):
 		var i: int = (n >> 1) ^ ( -(n & 1)) #funky way of making the sequence 0, -1, 1, -2, 2... #https://stackoverflow.com/questions/2210923/zig-zag-decoding
 		#can be read as (n div 2 ) * -1 ^ (n mod 2) in algebraic terms
-		#this one needs to be positive
+		#this index needs to be positive as it will be returned
 		i = posmod(i + start_i, size)
 		#modulus operation to wrap
 		var next_i = (i + 1) % size
@@ -251,6 +253,7 @@ func _find_tangent(start_i:int, from: Vector2, side:int, points: PackedVector2Ar
 		var next: int = sign(rope.cross(points[next_i] - from))
 		if prev == side and next == side:
 			return i
+	#should only return -1 if from is inside the polygon
 	return -1
 
 func calc_normal(line_pos:float,collision_position:Vector2,index:int, col_object: WrappedObject)->Vector2:
