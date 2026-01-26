@@ -4,6 +4,7 @@ extends Node2D
 enum DetectionType{RAYCAST, SEGEMENT_CAST, AREA_CCD}
 
 @export var detection_type: DetectionType = DetectionType.RAYCAST
+@export var width: float = 2
 
 @export_category('Physics')
 @export_flags_2d_physics var collision_mask: int = 1
@@ -18,6 +19,7 @@ var local_points: Array[Vector2]
 
 var space: PhysicsDirectSpaceState2D
 var line_segment: SegmentShape2D = SegmentShape2D.new()
+var endpoint_query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
 
 var CCD_shapes: Array[RID]
 
@@ -80,10 +82,13 @@ func _ready() -> void:
 	
 	#rope start fake wrapped object
 	wrapped_objects.append(WrappedObject.new())
-	
 	#rope end fake wrapped object
 	wrapped_objects.append(WrappedObject.new())
 	
+	var circle: CircleShape2D = CircleShape2D.new()
+	circle.radius = width / 2
+	endpoint_query.shape = circle
+	endpoint_query.collision_mask = collision_mask
 	
 	#if CCD_group != null:
 		#get_tree().get_nodes_in_group(CCD_group)
@@ -91,8 +96,8 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	
 	#set the start and end rope positions
-	wrapped_objects[0].point2.position = rope_start
-	wrapped_objects[-1].point1.position = rope_end
+	wrapped_objects[0].point2.position = constrain_endpoint(rope_start)
+	wrapped_objects[-1].point1.position = constrain_endpoint(rope_end)
 	
 	var curr_object: WrappedObject
 	#loop through current wrapped object to update there tangents and check if they need to be released
@@ -118,7 +123,7 @@ func _physics_process(delta: float) -> void:
 		
 		var collision_point: Vector2
 		var collision_object: WrappedObject = WrappedObject.new()
-		var exclude: Array[RID] = [wrapped_objects[i-1].rid,wrapped_objects[i].rid]
+		var exclude: Array[RID] = [wrapped_objects[i-1].rid, wrapped_objects[i].rid]
 		if detection_type == DetectionType.RAYCAST:
 			#cast ray back to previous object
 			var result: Dictionary = cast_ray(wrapped_objects[i].point1.position, wrapped_objects[i-1].point2.position,exclude)
@@ -284,6 +289,14 @@ func calc_normal(line_pos:float,collision_position:Vector2,index:int, col_object
 		return normal
 	else:
 		return normal
+
+
+func constrain_endpoint(position:Vector2)->Vector2:
+	endpoint_query.transform.origin = position
+	var result: Dictionary = space.get_rest_info(endpoint_query)
+	if result != {}:
+		return result.point + result.normal * width / 2
+	return position
 
 func _draw() -> void:
 	draw_set_transform_matrix(self.global_transform.inverse())
