@@ -27,6 +27,7 @@ class WrapPoint:
 	var position: Vector2
 	var prev_position: Vector2
 	var direction: Vector2
+	## stored the indices of where tangents were found in the polygon's vertices
 	var tangent_indices: Vector2i
 
 class WrappedObject:
@@ -48,25 +49,22 @@ class WrappedObject:
 	
 	## calcs wrap angle and returns true if the object should be released
 	func calc_turns()->void:
-		#TODO could probably replace orth dot with a cross product to skip calculating orthogonal
-		#orth dot describes which side of normal 1 does normal 2 lie, ie CC or CCW
-		#TODO now that we are storing points in this object may be able to do this logic without normals,
-		# we would still need some form of direction, could get previous objects positions but thats difficult inside this object
-		# so it wouldnt be much different if we tracked normals or rope direction. leave as is?
 		var cross: int = directional_cross()
 		if cross == 0:
 			return
 		var dot: float = directional_dot()
 		if cross != prev_cross:
-			#orth changed side
+			#crossed over the 180 or 0 degree mark relative to to other tangent point
 			if  dot < 0:
 				#if the directions are pointing opposite a full turn (not half turn) has been completed
-				turns -= cross * direction
+				turns += cross * direction
 		prev_cross = cross
 	
+	## returns the sign of the cross product between the tangent directions
 	func directional_cross()-> int:
 		return sign(point1.direction.cross(point2.direction))
 	
+	## returns the dot product between the tangent directions
 	func directional_dot() -> int:
 		return point1.direction.dot(point2.direction)
 	
@@ -91,10 +89,12 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	
+	#set the start and end rope positions
 	wrapped_objects[0].point2.position = rope_start
 	wrapped_objects[-1].point1.position = rope_end
-
+	
 	var curr_object: WrappedObject
+	#loop through current wrapped object to update there tangents and check if they need to be released
 	for i:int in range(1,wrapped_objects.size() - 1):
 		curr_object = wrapped_objects[i]
 		
@@ -106,11 +106,13 @@ func _physics_process(delta: float) -> void:
 			# release object
 			unwrap_queue.append(curr_object)
 			
-		
+	
+	#release objects queued for release
 	for object:WrappedObject in unwrap_queue:
 		wrapped_objects.erase(object)
 	unwrap_queue.clear()
 	
+	#scane for new intersecting objects
 	for i:int in range(1, wrapped_objects.size()):
 		
 		var collision_point: Vector2
@@ -147,16 +149,16 @@ func _physics_process(delta: float) -> void:
 			print('abort')
 			continue
 		
-		#get the initial wrap direction +ve for CW and -ve for CCW
-		collision_object.direction = - collision_object.prev_cross
+		#get the initial wrap direction -ve for CW and +ve for CCW
+		collision_object.direction = collision_object.prev_cross
 		wrapped_objects.insert(i,collision_object)
 	
+	#update prev positions
 	for object: WrappedObject in wrapped_objects:
 		object.point1.prev_position = object.point1.position
 		object.point2.prev_position = object.point2.position
 	
 	calc_global_points()
-	
 	queue_redraw()
 
 func cast_ray(A:Vector2,B:Vector2,exclude:Array[RID]) -> Dictionary:
@@ -186,16 +188,10 @@ func cast_segment(from: Vector2, to: Vector2, exclude: Array[RID])->Dictionary:
 	return space.get_rest_info(query)
 		
 
-## returns a rect2 with the size represnting the tangent normal
 func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
 	var shape_type = PhysicsServer2D.shape_get_type(object.shape_rid)
 	# note that a rect is used to store a position and a normal (in the size)
 	var result: Rect2 = Rect2(Vector2.ZERO,Vector2.ZERO)
-	var point: Vector2
-	if first_point:
-		point = object.point1
-	else:
-		point = object.point2
 	match shape_type:
 		PhysicsServer2D.ShapeType.SHAPE_CIRCLE:
 			var radius: float = PhysicsServer2D.shape_get_data(object.shape_rid)
@@ -205,8 +201,6 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
 			point.position = center + from_center.normalized().rotated(angle) * radius
 			point.direction = from - point.position
 			return true
-			#result.size = from_center.normalized().rotated(angle)
-			#result.position = center + result.size * radius
 		PhysicsServer2D.ShapeType.SHAPE_CAPSULE:
 			pass
 		PhysicsServer2D.ShapeType.SHAPE_RECTANGLE:
@@ -237,7 +231,8 @@ func _find_tangent(start_i:int, from: Vector2, side:int, points: PackedVector2Ar
 	#most of the start_i is going to be correct so should optimise to return it quickly
 	var size: int = points.size()
 	for n: int in range(1,ceil((size + 1)/2)):
-		var i: int = (n >> 1) ^ ( -(n & 1)) #funky way of making the sequence 0, -1, 1, -2, 2 #https://stackoverflow.com/questions/2210923/zig-zag-decoding
+		var i: int = (n >> 1) ^ ( -(n & 1)) #funky way of making the sequence 0, -1, 1, -2, 2... #https://stackoverflow.com/questions/2210923/zig-zag-decoding
+		#can be read as (n div 2 ) * -1 ^ (n mod 2) in algebraic terms
 		#this one needs to be positive
 		i = posmod(n + start_i, size)
 		#modulus operation to wrap
@@ -288,13 +283,15 @@ func _draw() -> void:
 	debug_vectors.clear()
 	
 
+## populate all the wrapped objections positions into one array
 func calc_global_points()->void:
-	global_points.clear()
-	global_points.append(wrapped_objects[0].point2.position)
+	global_points.resize((wrapped_objects.size() -1) * 2)
+	global_points[0] = wrapped_objects[0].point2.position
 	for i:int in range(1,wrapped_objects.size()-1):
-		global_points.append(wrapped_objects[i].point1.position)
-		global_points.append(wrapped_objects[i].point2.position)
-	global_points.append(wrapped_objects[-1].point1.position)
+		var p_i: int = (i * 2) - 1
+		global_points[p_i] = wrapped_objects[i].point1.position
+		global_points[p_i + 1] = wrapped_objects[i].point2.position
+	global_points[-1] = wrapped_objects[-1].point1.position
 
 func debug_vector(from:Vector2,to:Vector2)->void:
 	debug_vectors.append(Rect2(from,to))
