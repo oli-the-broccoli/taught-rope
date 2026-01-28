@@ -216,34 +216,36 @@ func _line_segment_margin(segment:Rect2, margin: float)->Rect2:
 func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint, angular_direction: int)->bool:
 	var shape_type:int = PhysicsServer2D.shape_get_type(object.shape_rid)
 	# note that a rect is used to store a position and a normal (in the size)
+	var trans: Transform2D = object.get_global_transform()
+	var from_p: Vector2 = from * trans
 	match shape_type:
 		PhysicsServer2D.ShapeType.SHAPE_CIRCLE:
 			var radius: float = PhysicsServer2D.shape_get_data(object.shape_rid)
-			var center: Vector2 = object.get_global_transform().origin
-			var from_center: Vector2 = (from - center)
+			var from_center: Vector2 = from_p
 			var angle: float = acos(radius/from_center.length()) * angular_direction
-			point.position = center + from_center.normalized().rotated(angle) * radius
+			point.position = trans * (from_center.normalized().rotated(angle) * radius)
 			point.direction = (from - point.position).normalized()
-			bool()
 			return true
 		PhysicsServer2D.ShapeType.SHAPE_CAPSULE:
-			pass
+			var capsule: Vector2 = PhysicsServer2D.shape_get_data(object.shape_rid)
+			var center: Vector2 = Vector2(0,capsule.x/2 - capsule.y)
+			center *= angular_direction * sign(from_p.x)
+			var from_center: Vector2 = (from_p - center)
+			var angle: float = acos(capsule.y/from_center.length()) * angular_direction
+			point.position = trans * (center + from_center.normalized().rotated(angle) * capsule.y)
+			point.direction = (from - point.position).normalized()
+			return true
 		PhysicsServer2D.ShapeType.SHAPE_RECTANGLE:
 			var diag: Vector2 = PhysicsServer2D.shape_get_data(object.shape_rid)
 			var rect_points: PackedVector2Array = [diag, diag * Vector2(1,-1), -diag, diag * Vector2(-1,1)]
-			var poly_trans: Transform2D = object.get_global_transform()
-			var from_p: Vector2 = from * poly_trans
 			point.tangent_index = _find_tangent(point.tangent_index, from_p, angular_direction, rect_points)
-			point.position = poly_trans * rect_points[point.tangent_index ]
+			point.position = trans * rect_points[point.tangent_index ]
 			point.direction = (from - point.position).normalized()
 			return true
 		PhysicsServer2D.ShapeType.SHAPE_CONVEX_POLYGON:
 			var poly_points: PackedVector2Array = PhysicsServer2D.shape_get_data(object.shape_rid)
-			var poly_trans: Transform2D = object.get_global_transform()
-			#find first tangent
-			var from_p: Vector2 = from * poly_trans
 			point.tangent_index = _find_tangent(point.tangent_index, from_p, angular_direction, poly_points)
-			point.position = poly_trans * poly_points[point.tangent_index ]
+			point.position = trans * poly_points[point.tangent_index ]
 			point.direction = (from - point.position).normalized()
 			return true
 		_:
