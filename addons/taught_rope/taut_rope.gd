@@ -87,7 +87,7 @@ class WrappedObject:
 		return collider.global_transform * PhysicsServer2D.body_get_shape_transform(rid,shape)
 
 	func is_disabled()->bool:
-		return collider.is_shape_owner_disabled(shape_owner)
+		return collider.is_shape_owner_disabled(shape_owner) or not is_instance_valid(collider) or not collider.is_inside_tree()
 
 func _ready() -> void:
 	space = get_world_2d().direct_space_state
