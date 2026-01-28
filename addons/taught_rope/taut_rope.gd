@@ -17,7 +17,6 @@ var rope_end: Vector2
 var wrapped_objects: Array[WrappedObject]
 var unwrap_queue: Array[WrappedObject]
 var global_points: Array[Vector2]
-var local_points: Array[Vector2]
 
 var space: PhysicsDirectSpaceState2D
 var line_segment: SegmentShape2D = SegmentShape2D.new()
@@ -217,20 +216,25 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint, angular_
 	var shape_type:int = PhysicsServer2D.shape_get_type(object.shape_rid)
 	# note that a rect is used to store a position and a normal (in the size)
 	var trans: Transform2D = object.get_global_transform()
-	var from_p: Vector2 = from * trans
+	var local_from: Vector2 = from * trans
 	match shape_type:
 		PhysicsServer2D.ShapeType.SHAPE_CIRCLE:
 			var radius: float = PhysicsServer2D.shape_get_data(object.shape_rid)
-			var from_center: Vector2 = from_p
+			var from_center: Vector2 = local_from
 			var angle: float = acos(radius/from_center.length()) * angular_direction
 			point.position = trans * (from_center.normalized().rotated(angle) * radius)
 			point.direction = (from - point.position).normalized()
 			return true
 		PhysicsServer2D.ShapeType.SHAPE_CAPSULE:
+			#capsule treated like circle thats at one end of a segment.
+			#this logic chooses which end
 			var capsule: Vector2 = PhysicsServer2D.shape_get_data(object.shape_rid)
 			var center: Vector2 = Vector2(0,capsule.x/2 - capsule.y)
-			center *= angular_direction * sign(from_p.x)
-			var from_center: Vector2 = (from_p - center)
+			var top: int = sign(local_from.y)
+			var side: int = sign(local_from.x + capsule.y * top * angular_direction)
+			center *= side * angular_direction
+			#from here treated as a normal circle with capsule.y = radius
+			var from_center: Vector2 = (local_from - center)
 			var angle: float = acos(capsule.y/from_center.length()) * angular_direction
 			point.position = trans * (center + from_center.normalized().rotated(angle) * capsule.y)
 			point.direction = (from - point.position).normalized()
@@ -238,14 +242,14 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint, angular_
 		PhysicsServer2D.ShapeType.SHAPE_RECTANGLE:
 			var diag: Vector2 = PhysicsServer2D.shape_get_data(object.shape_rid)
 			var rect_points: PackedVector2Array = [diag, diag * Vector2(1,-1), -diag, diag * Vector2(-1,1)]
-			point.tangent_index = _find_tangent(point.tangent_index, from_p, angular_direction, rect_points)
-			point.position = trans * rect_points[point.tangent_index ]
+			point.tangent_index = _find_tangent(point.tangent_index, local_from, angular_direction, rect_points)
+			point.position = trans * rect_points[point.tangent_index]
 			point.direction = (from - point.position).normalized()
 			return true
 		PhysicsServer2D.ShapeType.SHAPE_CONVEX_POLYGON:
 			var poly_points: PackedVector2Array = PhysicsServer2D.shape_get_data(object.shape_rid)
-			point.tangent_index = _find_tangent(point.tangent_index, from_p, angular_direction, poly_points)
-			point.position = trans * poly_points[point.tangent_index ]
+			point.tangent_index = _find_tangent(point.tangent_index, local_from, angular_direction, poly_points)
+			point.position = trans * poly_points[point.tangent_index]
 			point.direction = (from - point.position).normalized()
 			return true
 		_:
