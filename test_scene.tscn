@@ -12,7 +12,7 @@ height = 60.26
 [sub_resource type="CircleShape2D" id="CircleShape2D_sasra"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ia1lp"]
-size = Vector2(61.28212, 20)
+size = Vector2(32, 80)
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_coq8p"]
 
@@ -47,12 +47,16 @@ shape = SubResource("CapsuleShape2D_ia1lp")
 position = Vector2(-6, 30)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D2"]
-position = Vector2(51, 3)
+position = Vector2(30, 2)
 shape = SubResource("CircleShape2D_sasra")
 
 [node name="CollisionShape2D2" type="CollisionShape2D" parent="StaticBody2D2"]
-position = Vector2(127.03955, -53.968655)
-rotation = 0.50749546
+position = Vector2(94, -46)
+shape = SubResource("RectangleShape2D_ia1lp")
+
+[node name="CollisionShape2D3" type="CollisionShape2D" parent="StaticBody2D2"]
+position = Vector2(150, -70)
+rotation = 1.5707964
 shape = SubResource("RectangleShape2D_ia1lp")
 
 [node name="StaticBody2D3" type="StaticBody2D" parent="."]
@@ -70,4 +74,4 @@ shape = SubResource("CircleShape2D_2nij2")
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="StaticBody2D4"]
 position = Vector2(-34, -8)
-polygon = PackedVector2Array(-29, -66, -51, -57, -55, -32, -34, -22, -11, -17, 13, -21, 23, -35, -2, -57)
+polygon = PackedVector2Array(-31, -46, -45, -71, -55, -32, -34, -22, -11, -16, 13, -21, -10, -35, -13, -56)
