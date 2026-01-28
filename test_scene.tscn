@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://c76517rs4di3t"]
+[gd_scene load_steps=10 format=3 uid="uid://c76517rs4di3t"]
 
 [ext_resource type="Script" uid="uid://2rvyef4f7j8l" path="res://test_scene.gd" id="1_ia1lp"]
 [ext_resource type="Script" uid="uid://fud7pr2rp6cm" path="res://addons/taught_rope/taut_rope.gd" id="2_sasra"]
@@ -10,6 +10,9 @@ radius = 25.495098
 height = 60.26
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_sasra"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_7cbxl"]
+radius = 16.0
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ia1lp"]
 size = Vector2(32, 80)
@@ -50,6 +53,10 @@ position = Vector2(-6, 30)
 position = Vector2(30, 2)
 shape = SubResource("CircleShape2D_sasra")
 
+[node name="CollisionShape2D4" type="CollisionShape2D" parent="StaticBody2D2"]
+position = Vector2(94, -6)
+shape = SubResource("CircleShape2D_7cbxl")
+
 [node name="CollisionShape2D2" type="CollisionShape2D" parent="StaticBody2D2"]
 position = Vector2(94, -46)
 shape = SubResource("RectangleShape2D_ia1lp")
@@ -74,4 +81,4 @@ shape = SubResource("CircleShape2D_2nij2")
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="StaticBody2D4"]
 position = Vector2(-34, -8)
-polygon = PackedVector2Array(-31, -46, -45, -71, -55, -32, -34, -22, -11, -16, 13, -21, -10, -35, -13, -56)
+polygon = PackedVector2Array(-30, -72, -45, -71, -55, -32, -34, -22, -11, -16, 13, -21, 2, -40, -22, -48)

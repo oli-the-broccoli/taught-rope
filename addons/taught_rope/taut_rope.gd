@@ -77,6 +77,9 @@ class WrappedObject:
 	func directional_dot() -> float:
 		return point1.direction.dot(point2.direction)
 	
+	func compare(object:WrappedObject)->bool:
+		return (collider == object.collider) and (shape == object.shape)
+	
 	func get_global_transform()->Transform2D:
 		return collider.global_transform * PhysicsServer2D.body_get_shape_transform(rid,shape)
 
@@ -100,7 +103,6 @@ func _ready() -> void:
 		#get_tree().get_nodes_in_group(CCD_group)
 
 func _physics_process(delta: float) -> void:
-	
 	#set the start and end rope positions
 	wrapped_objects[0].point2.position = constrain_endpoint(rope_start)
 	wrapped_objects[-1].point1.position = constrain_endpoint(rope_end)
@@ -127,6 +129,9 @@ func _physics_process(delta: float) -> void:
 		var exclude: Array[RID] = []#[wrapped_objects[i-1].rid, wrapped_objects[i].rid]
 		var line_cast_segment: Rect2 = Rect2(wrapped_objects[i].point1.position, wrapped_objects[i-1].point2.position)
 		line_cast_segment = _line_segment_margin(line_cast_segment, ray_margin)
+		#check if line cast segement is zero before bothering to do collision check
+		if line_cast_segment.position.is_equal_approx(line_cast_segment.size):
+			continue
 		if detection_type == DetectionType.RAYCAST:
 			#cast ray back to previous object
 			var result: Dictionary = cast_ray(line_cast_segment,exclude)
@@ -146,7 +151,9 @@ func _physics_process(delta: float) -> void:
 				collision_object.collider = instance_from_id(result.collider_id)
 				collision_object.shape = result.shape
 		
-		
+		#check if the collided object is one of the objects the ray is sent between
+		if collision_object.compare(wrapped_objects[i]) or collision_object.compare(wrapped_objects[i-1]):
+			continue
 		
 		collision_object.point1.position = collision_point
 		collision_object.point1.direction = line_cast_segment.size - collision_point
@@ -259,7 +266,7 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint, angular_
 
 ## finds a tangent to the convex polygon given by points to the vector from. starts searching at the start_i index.
 ## returns -1 if no tangent is found ie, from is inside the polygon
-func _find_tangent(start_i:int, from: Vector2, side:int, points: PackedVector2Array)->int:
+func _find_tangent(start_i:int, local_from: Vector2, side:int, points: PackedVector2Array)->int:
 	#most of the start_i is going to be correct so should optimise to return it quickly
 	var size: int = points.size()
 	for n: int in range(size):
@@ -269,11 +276,16 @@ func _find_tangent(start_i:int, from: Vector2, side:int, points: PackedVector2Ar
 		i = posmod(i + start_i, size)
 		#modulus operation to wrap
 		var next_i: int = (i + 1) % size
-		var rope: Vector2 = (points[i] - from)
-		var prev: int = sign(rope.cross(points[i - 1] - from))
-		var next: int = sign(rope.cross(points[next_i] - from))
-		if prev == side and next == side:
+		var rope: Vector2 = (points[i] - local_from)
+		var prev: int = sign(rope.cross(points[i - 1] - local_from))
+		var next: int = sign(rope.cross(points[next_i] - local_from))
+		#if at least one is equal to the side. and the other is 0 or of the same sign.
+		# a 0 occurs when either rope length is 0. ie from is on one of the poly points
+		# or if the rope is paralell to a poly segment
+		# of course if they both equal side than its a tangnent as well
+		if (prev == side or next == side) and prev * next >= 0:
 			return i
+
 	#should only return -1 if from is inside the polygon
 	return -1
 
