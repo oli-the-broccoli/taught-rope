@@ -48,6 +48,7 @@ class WrappedObject:
 	var point1: WrapPoint = WrapPoint.new()
 	var point2: WrapPoint = WrapPoint.new()
 	var prev_cross: int
+	var prev_angle: float
 	var turns: int = 0
 	## The direction point 2 wraps around the shape. +1 for clockwise, -1 CCW. Point 1 always wraps opposite
 	var angular_direction: int
@@ -57,13 +58,16 @@ class WrappedObject:
 		var cross: int = directional_cross()
 		if cross == 0:
 			return
-		var dot: float = directional_dot()
+		## the positive angle from direction1 to direction2
+		var angle: float = abs(point1.direction.angle_to(point2.direction))
 		if cross != prev_cross:
 			#crossed over the 180 or 0 degree mark relative to to other tangent point
-			if  dot < 0:
-				#if the directions are pointing opposite a full turn (not half turn) has been completed
+			if angle + prev_angle >= PI:
+				#the angle from the previous direction2 to the new direction2 which passes over direction1
+				#must be greater than 180 to adjust number of turns.
 				turns += cross * angular_direction
-				
+		
+		prev_angle = angle
 		prev_cross = cross
 	
 	## returns the sign of the cross product between the tangent directions
