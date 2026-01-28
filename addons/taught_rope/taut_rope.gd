@@ -229,17 +229,22 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint, angular_
 		PhysicsServer2D.ShapeType.SHAPE_CAPSULE:
 			pass
 		PhysicsServer2D.ShapeType.SHAPE_RECTANGLE:
-			pass
+			var diag: Vector2 = PhysicsServer2D.shape_get_data(object.shape_rid)
+			var rect_points: PackedVector2Array = [diag, diag * Vector2(1,-1), -diag, diag * Vector2(-1,1)]
+			var poly_trans: Transform2D = object.get_global_transform()
+			var from_p: Vector2 = from * poly_trans
+			point.tangent_index = _find_tangent(point.tangent_index, from_p, angular_direction, rect_points)
+			point.position = poly_trans * rect_points[point.tangent_index ]
+			point.direction = (from - point.position).normalized()
+			return true
 		PhysicsServer2D.ShapeType.SHAPE_CONVEX_POLYGON:
 			var poly_points: PackedVector2Array = PhysicsServer2D.shape_get_data(object.shape_rid)
-			var prev_direction: Vector2 = point.direction
 			var poly_trans: Transform2D = object.get_global_transform()
 			#find first tangent
 			var from_p: Vector2 = from * poly_trans
 			point.tangent_index = _find_tangent(point.tangent_index, from_p, angular_direction, poly_points)
 			point.position = poly_trans * poly_points[point.tangent_index ]
 			point.direction = (from - point.position).normalized()
-
 			return true
 		_:
 			print("shape type: ",shape_type , " not handled")
