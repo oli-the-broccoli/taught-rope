@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://c76517rs4di3t"]
+[gd_scene load_steps=9 format=3 uid="uid://c76517rs4di3t"]
 
 [ext_resource type="Script" uid="uid://2rvyef4f7j8l" path="res://test_scene.gd" id="1_ia1lp"]
 [ext_resource type="Script" uid="uid://fud7pr2rp6cm" path="res://addons/taught_rope/taut_rope.gd" id="2_sasra"]
@@ -6,7 +6,13 @@
 [sub_resource type="CircleShape2D" id="CircleShape2D_ia1lp"]
 radius = 25.495098
 
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_ia1lp"]
+height = 60.26
+
 [sub_resource type="CircleShape2D" id="CircleShape2D_sasra"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ia1lp"]
+size = Vector2(61.28212, 20)
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_coq8p"]
 
@@ -32,12 +38,22 @@ position = Vector2(-31, 39)
 position = Vector2(-29, 12)
 shape = SubResource("CircleShape2D_ia1lp")
 
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="StaticBody2D"]
+position = Vector2(-91, -46)
+rotation = 0.2863971
+shape = SubResource("CapsuleShape2D_ia1lp")
+
 [node name="StaticBody2D2" type="StaticBody2D" parent="."]
 position = Vector2(-6, 30)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D2"]
 position = Vector2(51, 3)
 shape = SubResource("CircleShape2D_sasra")
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="StaticBody2D2"]
+position = Vector2(127.03955, -53.968655)
+rotation = 0.50749546
+shape = SubResource("RectangleShape2D_ia1lp")
 
 [node name="StaticBody2D3" type="StaticBody2D" parent="."]
 position = Vector2(-43, 70)
