@@ -32,7 +32,7 @@ class WrapPoint:
 	var prev_position: Vector2
 	var direction: Vector2
 	## stored the indices of where tangents were found in the polygon's vertices
-	var tangent_indices: Vector2i
+	var tangent_index: int
 
 class WrappedObject:
 	var collider: CollisionObject2D:
@@ -49,7 +49,8 @@ class WrappedObject:
 	var point2: WrapPoint = WrapPoint.new()
 	var prev_cross: int
 	var turns: int = 0
-	var direction: int
+	## The direction point 2 wraps around the shape. +1 for clockwise, -1 CCW. Point 1 always wraps opposite
+	var angular_direction: int
 	
 	## calcs wrap angle and returns true if the object should be released
 	func calc_turns()->void:
@@ -61,7 +62,7 @@ class WrappedObject:
 			#crossed over the 180 or 0 degree mark relative to to other tangent point
 			if  dot < 0:
 				#if the directions are pointing opposite a full turn (not half turn) has been completed
-				turns += cross * direction
+				turns += cross * angular_direction
 				
 		prev_cross = cross
 	
@@ -107,8 +108,8 @@ func _physics_process(delta: float) -> void:
 		curr_object = wrapped_objects[i]
 		
 		#find next tangent points
-		calc_tangent(curr_object, wrapped_objects[i-1].point2.position, curr_object.point1)
-		calc_tangent(curr_object, wrapped_objects[i+1].point1.position, curr_object.point2)
+		calc_tangent(curr_object, wrapped_objects[i-1].point2.position, curr_object.point1, -curr_object.angular_direction)
+		calc_tangent(curr_object, wrapped_objects[i+1].point1.position, curr_object.point2, curr_object.angular_direction)
 		curr_object.calc_turns()
 		if curr_object.turns < 0:
 			# release object
@@ -142,12 +143,12 @@ func _physics_process(delta: float) -> void:
 				collision_object.collider = instance_from_id(result.collider_id)
 				collision_object.shape = result.shape
 		
+		
+		
 		collision_object.point1.position = collision_point
-		collision_object.point1.direction = wrapped_objects[i-1].point2.position - collision_point
+		collision_object.point1.direction = line_cast_segment.size - collision_point
 		collision_object.point2.position = collision_point
-		collision_object.point2.direction = wrapped_objects[i].point1.position - collision_point
-		calc_tangent(collision_object, wrapped_objects[i-1].point2.position, collision_object.point1)
-		calc_tangent(collision_object, wrapped_objects[i].point1.position, collision_object.point2)
+		collision_object.point2.direction = line_cast_segment.position - collision_point
 		collision_object.prev_cross = collision_object.directional_cross()
 		if collision_object.prev_cross == 0:
 			#the directions are parallel so we cant determine the wrap direction
@@ -155,9 +156,10 @@ func _physics_process(delta: float) -> void:
 			#and a non zero angle between normals will be made
 			print('abort')
 			continue
+		collision_object.angular_direction = collision_object.prev_cross
+		calc_tangent(collision_object, wrapped_objects[i-1].point2.position, collision_object.point1, -collision_object.angular_direction)
+		calc_tangent(collision_object, wrapped_objects[i].point1.position, collision_object.point2, collision_object.angular_direction)
 		
-		#get the initial wrap direction -ve for CW and +ve for CCW
-		collision_object.direction = collision_object.prev_cross
 		wrapped_objects.insert(i,collision_object)
 	
 	#release objects queued for release
@@ -192,13 +194,6 @@ func cast_ray(line:Rect2, exclude:Array[RID]) -> Dictionary:
 		collision_result['position'] = result.position
 		return collision_result
 
-## shrink a line segment along its direction by margin
-## rect2 is used to store the start and end position of the segment in position and size respectfully
-func _line_segment_margin(segment:Rect2, margin: float)->Rect2:
-	var dir: Vector2 = (segment.size - segment.position)
-	dir = dir.normalized() * min(margin, dir.length() / 2)
-	return Rect2(segment.position + dir, segment.size - dir)
-
 func cast_segment(line: Rect2, exclude: Array[RID])->Dictionary:
 	var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
 	query.exclude = exclude
@@ -206,9 +201,15 @@ func cast_segment(line: Rect2, exclude: Array[RID])->Dictionary:
 	line_segment.b = line.size
 	query.shape = line_segment
 	return space.get_rest_info(query)
-		
 
-func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
+## shrink a line segment along its direction by margin
+## rect2 is used to store the start and end position of the segment in position and size respectfully
+func _line_segment_margin(segment:Rect2, margin: float)->Rect2:
+	var dir: Vector2 = (segment.size - segment.position)
+	dir = dir.normalized() * min(margin, dir.length() / 2)
+	return Rect2(segment.position + dir, segment.size - dir)
+
+func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint, angular_direction: int)->bool:
 	var shape_type:int = PhysicsServer2D.shape_get_type(object.shape_rid)
 	# note that a rect is used to store a position and a normal (in the size)
 	match shape_type:
@@ -216,9 +217,10 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
 			var radius: float = PhysicsServer2D.shape_get_data(object.shape_rid)
 			var center: Vector2 = object.get_global_transform().origin
 			var from_center: Vector2 = (from - center)
-			var angle: float = acos(radius/from_center.length()) * sign(from_center.cross(point.position - center))
+			var angle: float = acos(radius/from_center.length()) * angular_direction
 			point.position = center + from_center.normalized().rotated(angle) * radius
 			point.direction = (from - point.position).normalized()
+			bool()
 			return true
 		PhysicsServer2D.ShapeType.SHAPE_CAPSULE:
 			pass
@@ -230,22 +232,10 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
 			var poly_trans: Transform2D = object.get_global_transform()
 			#find first tangent
 			var from_p: Vector2 = from * poly_trans
-			var i1: int = _find_tangent(point.tangent_indices[0], from_p, 1, poly_points)
-			var p1: Vector2 = poly_trans * poly_points[i1]
-			var d1: Vector2 = (from - p1).normalized()
-			#find second tangent
-			var i2: int = _find_tangent(point.tangent_indices[1], from_p, -1, poly_points)
-			var p2: Vector2 = poly_trans * poly_points[i2]
-			var d2: Vector2 = (from - p2).normalized()
-			#choose tangent that best aligns with previous direction (tangent)
-			if prev_direction.dot(d2) < prev_direction.dot(d1):
-				point.position = p1
-				point.direction = (from - p1).normalized()
-				point.tangent_indices = Vector2i(i1,i2)
-			else:
-				point.position = p2
-				point.direction = (from - p2).normalized()
-				point.tangent_indices = Vector2i(i2,i1)
+			point.tangent_index = _find_tangent(point.tangent_index, from_p, angular_direction, poly_points)
+			point.position = poly_trans * poly_points[point.tangent_index ]
+			point.direction = (from - point.position).normalized()
+
 			return true
 		_:
 			print("shape type: ",shape_type , " not handled")
