@@ -43,7 +43,9 @@ class WrappedObject:
 		set(value):
 			shape = value
 			shape_rid = PhysicsServer2D.body_get_shape(rid,shape)
+			shape_owner = collider.shape_find_owner(value)
 	var shape_rid: RID
+	var shape_owner: int
 	var point1: WrapPoint = WrapPoint.new()
 	var point2: WrapPoint = WrapPoint.new()
 	var prev_cross: int
@@ -51,6 +53,7 @@ class WrappedObject:
 	var turns: int = 0
 	## The direction point 2 wraps around the shape. +1 for clockwise, -1 CCW. Point 1 always wraps opposite
 	var angular_direction: int
+
 	
 	## calcs wrap angle and returns true if the object should be released
 	func calc_turns()->void:
@@ -83,6 +86,8 @@ class WrappedObject:
 	func get_global_transform()->Transform2D:
 		return collider.global_transform * PhysicsServer2D.body_get_shape_transform(rid,shape)
 
+	func is_disabled()->bool:
+		return collider.is_shape_owner_disabled(shape_owner)
 
 func _ready() -> void:
 	space = get_world_2d().direct_space_state
@@ -111,6 +116,11 @@ func _physics_process(delta: float) -> void:
 	#loop through current wrapped object to update there tangents and check if they need to be released
 	for i:int in range(1,wrapped_objects.size() - 1):
 		curr_object = wrapped_objects[i]
+		
+		#unwrap disabled objects
+		if curr_object.is_disabled():
+			unwrap_queue.append(curr_object)
+			#too continue or not? If we don't recalc tangents we could have self intersection... hmmm
 		
 		#find next tangent points
 		calc_tangent(curr_object, wrapped_objects[i-1].point2.position, curr_object.point1, -curr_object.angular_direction)
