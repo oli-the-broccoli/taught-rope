@@ -10,6 +10,8 @@ enum DetectionType{RAYCAST, SEGEMENT_CAST, AREA_CCD}
 @export_flags_2d_physics var collision_mask: int = 1
 @export var CCD_group: StringName
 
+var ray_margin: float = 1
+
 var rope_start: Vector2 = Vector2.ZERO
 var rope_end: Vector2
 var wrapped_objects: Array[WrappedObject]
@@ -113,20 +115,17 @@ func _physics_process(delta: float) -> void:
 			unwrap_queue.append(curr_object)
 			
 	
-	#release objects queued for release
-	for object:WrappedObject in unwrap_queue:
-		wrapped_objects.erase(object)
-	unwrap_queue.clear()
-	
 	#scane for new intersecting objects
 	for i:int in range(1, wrapped_objects.size()):
 		
 		var collision_point: Vector2
 		var collision_object: WrappedObject = WrappedObject.new()
-		var exclude: Array[RID] = [wrapped_objects[i-1].rid, wrapped_objects[i].rid]
+		var exclude: Array[RID] = []#[wrapped_objects[i-1].rid, wrapped_objects[i].rid]
+		var line_cast_segment: Rect2 = Rect2(wrapped_objects[i].point1.position, wrapped_objects[i-1].point2.position)
+		line_cast_segment = _line_segment_margin(line_cast_segment, ray_margin)
 		if detection_type == DetectionType.RAYCAST:
 			#cast ray back to previous object
-			var result: Dictionary = cast_ray(wrapped_objects[i].point1.position, wrapped_objects[i-1].point2.position,exclude)
+			var result: Dictionary = cast_ray(line_cast_segment,exclude)
 			if result == {}:
 				continue
 			else:
@@ -135,7 +134,7 @@ func _physics_process(delta: float) -> void:
 				collision_object = result.object
 		elif detection_type == DetectionType.SEGEMENT_CAST:
 			#cast segment back to previous object
-			var result: Dictionary = cast_segment(wrapped_objects[i].point1.position, wrapped_objects[i-1].point2.position,exclude)
+			var result: Dictionary = cast_segment(line_cast_segment,exclude)
 			if result == {}:
 				continue
 			else: 
@@ -161,16 +160,22 @@ func _physics_process(delta: float) -> void:
 		collision_object.direction = collision_object.prev_cross
 		wrapped_objects.insert(i,collision_object)
 	
+	#release objects queued for release
+	for object:WrappedObject in unwrap_queue:
+		wrapped_objects.erase(object)
+	unwrap_queue.clear()
+	
 	#update prev positions
 	for object: WrappedObject in wrapped_objects:
 		object.point1.prev_position = object.point1.position
 		object.point2.prev_position = object.point2.position
 	
+	
 	calc_global_points()
 	queue_redraw()
 
-func cast_ray(A:Vector2,B:Vector2,exclude:Array[RID]) -> Dictionary:
-	var query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(A,B,collision_mask)
+func cast_ray(line:Rect2, exclude:Array[RID]) -> Dictionary:
+	var query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(line.position, line.size, collision_mask)
 	query.hit_from_inside = false
 	query.exclude = exclude
 	var result: Dictionary = space.intersect_ray(query)
@@ -183,23 +188,29 @@ func cast_ray(A:Vector2,B:Vector2,exclude:Array[RID]) -> Dictionary:
 		new_object.shape = result.shape
 		collision_result['object'] = new_object
 		#fraction along the rope segment that is colliding
-		collision_result['line_pos'] = (A - result.position).length() / (A-B).length()
+		collision_result['line_pos'] = (line.position - result.position).length() / (line.position-line.size).length()
 		collision_result['position'] = result.position
 		return collision_result
 
-func cast_segment(from: Vector2, to: Vector2, exclude: Array[RID])->Dictionary:
+## shrink a line segment along its direction by margin
+## rect2 is used to store the start and end position of the segment in position and size respectfully
+func _line_segment_margin(segment:Rect2, margin: float)->Rect2:
+	var dir: Vector2 = (segment.size - segment.position)
+	dir = dir.normalized() * min(margin, dir.length() / 2)
+	return Rect2(segment.position + dir, segment.size - dir)
+
+func cast_segment(line: Rect2, exclude: Array[RID])->Dictionary:
 	var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
 	query.exclude = exclude
-	line_segment.a = from
-	line_segment.b = to
+	line_segment.a = line.position
+	line_segment.b = line.size
 	query.shape = line_segment
 	return space.get_rest_info(query)
 		
 
 func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint)->bool:
-	var shape_type = PhysicsServer2D.shape_get_type(object.shape_rid)
+	var shape_type:int = PhysicsServer2D.shape_get_type(object.shape_rid)
 	# note that a rect is used to store a position and a normal (in the size)
-	var result: Rect2 = Rect2(Vector2.ZERO,Vector2.ZERO)
 	match shape_type:
 		PhysicsServer2D.ShapeType.SHAPE_CIRCLE:
 			var radius: float = PhysicsServer2D.shape_get_data(object.shape_rid)
@@ -252,7 +263,7 @@ func _find_tangent(start_i:int, from: Vector2, side:int, points: PackedVector2Ar
 		#this index needs to be positive as it will be returned
 		i = posmod(i + start_i, size)
 		#modulus operation to wrap
-		var next_i = (i + 1) % size
+		var next_i: int = (i + 1) % size
 		var rope: Vector2 = (points[i] - from)
 		var prev: int = sign(rope.cross(points[i - 1] - from))
 		var next: int = sign(rope.cross(points[next_i] - from))
@@ -291,19 +302,19 @@ func calc_normal(line_pos:float,collision_position:Vector2,index:int, col_object
 		return normal
 
 
-func constrain_endpoint(position:Vector2)->Vector2:
-	endpoint_query.transform.origin = position
+func constrain_endpoint(pos:Vector2)->Vector2:
+	endpoint_query.transform.origin = pos
 	var result: Dictionary = space.get_rest_info(endpoint_query)
 	if result != {}:
 		return result.point + result.normal * width / 2
-	return position
+	return pos
 
 func _draw() -> void:
 	draw_set_transform_matrix(self.global_transform.inverse())
 	draw_polyline(global_points,Color.DARK_RED,1,true)
 	for point: Vector2 in global_points:
 		draw_circle(point,1,Color.WEB_GREEN,true)
-	for vector in debug_vectors:
+	for vector:Rect2 in debug_vectors:
 		draw_line(vector.position,vector.size,Color.WHITE)
 	debug_vectors.clear()
 	
