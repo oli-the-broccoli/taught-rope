@@ -2,13 +2,20 @@ class_name TautRope
 extends Node2D
 
 enum DetectionType{RAYCAST, SEGEMENT_CAST, AREA_CCD}
+enum RenderMode{HIDDEN, FULL, DEBUG}
 
 @export var detection_type: DetectionType = DetectionType.RAYCAST
-@export var width: float = 2
+@export var rope_width: float = 2
 
 @export_category('Physics')
 @export_flags_2d_physics var collision_mask: int = 1
 @export var CCD_group: StringName
+
+@export_category('Rendering')
+@export var render_mode: RenderMode = RenderMode.FULL
+@export var rope_color: Color = Color.DARK_RED
+@export var draw_nodes: bool = false
+@export var node_color: Color = Color.LIME_GREEN
 
 var ray_margin: float = 1
 
@@ -43,9 +50,11 @@ class WrappedObject:
 		set(value):
 			shape = value
 			shape_rid = PhysicsServer2D.body_get_shape(rid,shape)
+			shape_type = PhysicsServer2D.shape_get_type(shape_rid)
 			shape_owner = collider.shape_find_owner(value)
 	var shape_rid: RID
 	var shape_owner: int
+	var shape_type: PhysicsServer2D.ShapeType
 	var point1: WrapPoint = WrapPoint.new()
 	var point2: WrapPoint = WrapPoint.new()
 	var prev_cross: int
@@ -100,7 +109,7 @@ func _ready() -> void:
 	wrapped_objects.append(WrappedObject.new())
 	
 	var circle: CircleShape2D = CircleShape2D.new()
-	circle.radius = width / 2
+	circle.radius = rope_width / 2
 	endpoint_query.shape = circle
 	endpoint_query.collision_mask = collision_mask
 	
@@ -193,8 +202,9 @@ func _physics_process(delta: float) -> void:
 		object.point2.prev_position = object.point2.position
 	
 	
-	calc_global_points()
-	queue_redraw()
+	if render_mode != RenderMode.HIDDEN:
+		calc_global_points()
+		queue_redraw()
 
 func cast_ray(line:Rect2, exclude:Array[RID]) -> Dictionary:
 	var query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(line.position, line.size, collision_mask)
@@ -230,11 +240,9 @@ func _line_segment_margin(segment:Rect2, margin: float)->Rect2:
 	return Rect2(segment.position + dir, segment.size - dir)
 
 func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint, angular_direction: int)->bool:
-	var shape_type:int = PhysicsServer2D.shape_get_type(object.shape_rid)
-	# note that a rect is used to store a position and a normal (in the size)
 	var trans: Transform2D = object.get_global_transform()
 	var local_from: Vector2 = from * trans
-	match shape_type:
+	match object.shape_type:
 		PhysicsServer2D.ShapeType.SHAPE_CIRCLE:
 			var radius: float = PhysicsServer2D.shape_get_data(object.shape_rid)
 			var from_center: Vector2 = local_from
@@ -258,7 +266,7 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint, angular_
 			return true
 		PhysicsServer2D.ShapeType.SHAPE_RECTANGLE:
 			var diag: Vector2 = PhysicsServer2D.shape_get_data(object.shape_rid)
-			var rect_points: PackedVector2Array = [diag, diag * Vector2(1,-1), -diag, diag * Vector2(-1,1)]
+			var rect_points: PackedVector2Array = [diag, diag * Vector2(-1,1), -diag, diag * Vector2(1,-1)]
 			point.tangent_index = _find_tangent(point.tangent_index, local_from, angular_direction, rect_points)
 			point.position = trans * rect_points[point.tangent_index]
 			point.direction = (from - point.position).normalized()
@@ -270,7 +278,7 @@ func calc_tangent(object:WrappedObject, from:Vector2, point: WrapPoint, angular_
 			point.direction = (from - point.position).normalized()
 			return true
 		_:
-			print("shape type: ",shape_type , " not handled")
+			print("shape type: ",object.shape_type , " not handled")
 	
 	return false
 
@@ -333,18 +341,56 @@ func constrain_endpoint(pos:Vector2)->Vector2:
 	endpoint_query.transform.origin = pos
 	var result: Dictionary = space.get_rest_info(endpoint_query)
 	if result != {}:
-		return result.point + result.normal * width / 2
+		return result.point + result.normal * rope_width / 2
 	return pos
 
 func _draw() -> void:
 	draw_set_transform_matrix(self.global_transform.inverse())
-	draw_polyline(global_points,Color.DARK_RED,1,true)
-	for point: Vector2 in global_points:
-		draw_circle(point,1,Color.WEB_GREEN,true)
-	for vector:Rect2 in debug_vectors:
-		draw_line(vector.position,vector.size,Color.WHITE)
-	debug_vectors.clear()
-	
+	match render_mode:
+		RenderMode.HIDDEN:
+			draw_polyline(global_points, rope_color, rope_width, true)
+			if draw_nodes:
+				for point: Vector2 in global_points:
+					draw_circle(point,1, node_color,true)
+			
+			for vector:Rect2 in debug_vectors:
+				draw_line(vector.position,vector.size,Color.WHITE)
+			debug_vectors.clear()
+			
+		RenderMode.FULL:
+			draw_multiline(global_points, rope_color, rope_width, true)
+			var point1: WrapPoint = WrapPoint.new()
+			var point2: WrapPoint = WrapPoint.new()
+			for i:int in range(1, wrapped_objects.size()-1):
+				var object: WrappedObject = wrapped_objects[i]
+				point1 = object.point1
+				point2 = object.point2
+				var trans: Transform2D = object.get_global_transform()
+				if object.shape_type == PhysicsServer2D.ShapeType.SHAPE_CIRCLE:
+					var radius: float = PhysicsServer2D.shape_get_data(object.shape_rid)
+					var center: Vector2 = trans.origin
+					var angle1: float = (point1.position - center).angle()
+					var angle2: float = (point2.position - center).angle()
+					print(angle1, '	',angle2)
+					draw_arc(center, radius, angle1, angle2, 10, rope_color, rope_width, true)
+				if object.shape_type == PhysicsServer2D.ShapeType.SHAPE_CAPSULE:
+					pass
+				if object.shape_type ==PhysicsServer2D.ShapeType.SHAPE_RECTANGLE or  object.shape_type == PhysicsServer2D.ShapeType.SHAPE_CONVEX_POLYGON:
+					var poly_points: PackedVector2Array 
+					if object.shape_type ==PhysicsServer2D.ShapeType.SHAPE_RECTANGLE:
+						var diag: Vector2 = PhysicsServer2D.shape_get_data(object.shape_rid)
+						poly_points = [diag, diag * Vector2(-1,1), -diag, diag * Vector2(1,-1)]
+					else:
+						poly_points = PhysicsServer2D.shape_get_data(object.shape_rid)
+					var draw_points: Array[Vector2]
+					if point1.tangent_index != point2.tangent_index:
+						var j: int = point1.tangent_index
+						while j != point2.tangent_index:
+							j = posmod(j,poly_points.size())
+							draw_points.append(trans * poly_points[j])
+							j -= object.angular_direction
+						draw_points.append(trans * poly_points[point2.tangent_index])
+						draw_polyline(draw_points, rope_color, rope_width, true)
 
 ## populate all the wrapped objections positions into one array
 func calc_global_points()->void:
